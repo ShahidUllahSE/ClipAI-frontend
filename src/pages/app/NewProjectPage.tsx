@@ -1,4 +1,4 @@
-import { useCallback, useState, type DragEvent, type FormEvent } from 'react'
+import { useCallback, useState, useRef, type DragEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { Button, ErrorText, HelpText } from '@/components/ui'
@@ -14,6 +14,7 @@ import {
   formatDuration,
   validateVideoFile,
 } from '@/utils/video'
+import { ShotstackEditor } from '@/components/VideoEditor/ShotstackEditor'
 
 const fade = keyframes`
   from { opacity: 0; transform: translateY(0.3rem); }
@@ -75,6 +76,7 @@ const Layout = styled.form`
 `
 
 const Panel = styled.section`
+  position: relative;
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: 1rem;
   background: ${({ theme }) => theme.colors.surface};
@@ -116,6 +118,9 @@ const Step = styled.span`
 `
 
 const PanelBody = styled.div`
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: 0.85rem;
 `
 
@@ -132,7 +137,7 @@ const Dropzone = styled.div<{ $active: boolean; $hasFile: boolean }>`
   border-radius: 0.85rem;
   border: 1.5px dashed
     ${({ theme, $active, $hasFile }) =>
-      $active || $hasFile ? theme.colors.primary : theme.colors.border};
+    $active || $hasFile ? theme.colors.primary : theme.colors.border};
   background: ${({ theme, $active, $hasFile }) =>
     $active || $hasFile
       ? theme.colors.primarySoft
@@ -196,7 +201,7 @@ const ModeOption = styled.label<{ $active: boolean }>`
   border-radius: 0.75rem;
   border: 1px solid
     ${({ theme, $active }) =>
-      $active ? theme.colors.primary : theme.colors.border};
+    $active ? theme.colors.primary : theme.colors.border};
   background: ${({ theme, $active }) =>
     $active ? theme.colors.primarySoft : theme.colors.surface};
   cursor: pointer;
@@ -324,11 +329,14 @@ const Toggle = styled.label`
 `
 
 const Footer = styled.div`
-  margin-top: 0.75rem;
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
   padding-top: 0.75rem;
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   display: grid;
   gap: 0.55rem;
+  background: ${({ theme }) => theme.colors.surface};
 `
 
 const Progress = styled.div`
@@ -379,6 +387,32 @@ export function NewProjectPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const editorRef = useRef<any>(null)
+
+  const patchOptions = useCallback(
+    <K extends keyof ProjectOptions>(key: K, value: ProjectOptions[K]) => {
+      setOptions((prev) => ({ ...prev, [key]: value }))
+    },
+    [],
+  )
+
+  const applySavedCut = useCallback(async () => {
+    try {
+      const savedFile = await editorRef.current?.saveTrimmedClip()
+      if (!savedFile) {
+        setError('Could not cut and save the selected clip.')
+        return
+      }
+
+      setFile(savedFile)
+      setDuration(Math.max(1, Math.ceil((savedFile as any).duration || 5)))
+      setError('')
+      setTitle((prev) => prev || savedFile.name.replace(/\.[^.]+$/, ''))
+      patchOptions('timelineJson', { source: 'cut-saved', fileName: savedFile.name })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save cut video.')
+    }
+  }, [patchOptions])
 
   const onFile = useCallback(
     async (next: File | null) => {
@@ -407,12 +441,12 @@ export function NewProjectPage() {
     if (next) void onFile(next)
   }
 
-  const patchOptions = <K extends keyof ProjectOptions>(
-    key: K,
-    value: ProjectOptions[K],
-  ) => {
-    setOptions((prev) => ({ ...prev, [key]: value }))
-  }
+  const handleTimelineChange = useCallback(
+    (json: unknown) => {
+      patchOptions('timelineJson', json as ProjectOptions['timelineJson'])
+    },
+    [patchOptions],
+  )
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -526,6 +560,50 @@ export function NewProjectPage() {
               )}
             </PanelBody>
           </Panel>
+
+              {file && (
+            <Panel>
+              <PanelHead>
+                <PanelTitle>Edit video</PanelTitle>
+                <Step>T</Step>
+              </PanelHead>
+              <PanelBody>
+                <ShotstackEditor
+                  ref={editorRef}
+                  file={file}
+                  durationSeconds={duration}
+                  onTimelineChange={handleTimelineChange}
+                />
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid #e9e4f5' }}>
+                  <Button
+                    type="button"
+                    $variant="secondary"
+                    onClick={async () => {
+                      try {
+                        const json = await editorRef.current?.getTimelineJson()
+                        if (json) {
+                          patchOptions('timelineJson', json)
+                        } else {
+                          alert('Could not extract timeline JSON from the editor.')
+                        }
+                      } catch (e) {
+                        console.error(e)
+                        alert('Failed to save timeline.')
+                      }
+                    }}
+                  >
+                    Save timeline edits
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => void applySavedCut()}
+                  >
+                    Cut & save clip
+                  </Button>
+                </div>
+              </PanelBody>
+            </Panel>
+          )}
 
           <Panel>
             <PanelHead>

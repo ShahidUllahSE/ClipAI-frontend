@@ -46,6 +46,7 @@ export interface ProjectOptions {
   fadeInOut: boolean
   mirrorHorizontal: boolean
   introTitleCard: boolean
+  timelineJson?: any
 }
 
 export interface User {
