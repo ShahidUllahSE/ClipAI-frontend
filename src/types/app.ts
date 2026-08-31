@@ -4,7 +4,7 @@ export type PlanId = 'basic' | 'standard' | 'pro' | 'unlimited'
 export type BillingStatus = 'active' | 'past_due' | 'canceled' | 'none'
 export type UserRole = 'user' | 'admin'
 
-export type EditingModeId = 'talking-head' | 'rapid-cut' | 'asmr'
+export type EditingModeId = 'talking-head' | 'rapid-cut' | 'asmr' | 'ai-combine'
 
 export type ProjectStatus =
   | 'Uploading'
@@ -95,7 +95,9 @@ export interface VideoProject {
 
 export interface CreateProjectInput {
   file: File
+  secondaryFile?: File
   durationSeconds: number
+  secondaryDurationSeconds?: number
   mode: EditingModeId
   options: ProjectOptions
   title?: string

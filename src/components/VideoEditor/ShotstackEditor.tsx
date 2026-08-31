@@ -6,22 +6,31 @@ const Container = styled.div`
   flex-direction: column;
   gap: 1rem;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 `
 
 const PreviewBlock = styled.div`
   display: grid;
   gap: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   border-radius: ${({ theme }) => theme.radii.lg};
   overflow: hidden;
   border: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.ink};
   box-shadow: ${({ theme }) => theme.shadows.md};
+  isolation: isolate;
 `
 
 const VideoStage = styled.div`
   position: relative;
   width: 100%;
-  height: min(26rem, 48vh);
+  max-width: 100%;
+  height: min(22rem, 42vh);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -35,19 +44,107 @@ const Video = styled.video<{
   $translateX: number
   $translateY: number
   $opacity: number
+  $crop: string
 }>`
   display: block;
   max-width: 100%;
   max-height: 100%;
   width: auto;
   height: auto;
-  object-fit: contain;
-  transform: translate(${({ $translateX }) => `${$translateX}px`}, ${({ $translateY }) => `${$translateY}px`}) scale(${({ $zoom }) => $zoom});
+  object-fit: ${({ $crop }) => ($crop === 'none' ? 'contain' : 'cover')};
+  object-position: ${({ $crop }) => {
+    switch ($crop) {
+      case 'top':
+        return 'center top'
+      case 'bottom':
+        return 'center bottom'
+      case 'tight':
+        return 'center center'
+      case 'center':
+        return 'center center'
+      default:
+        return 'center center'
+    }
+  }};
+  transform: translate(${({ $translateX }) => `${$translateX}px`}, ${({ $translateY }) => `${$translateY}px`})
+    scale(${({ $zoom, $crop }) => ($crop === 'tight' ? $zoom * 1.25 : $zoom)});
   transform-origin: center center;
   opacity: ${({ $opacity }) => $opacity};
   filter: ${({ $filter }) => $filter};
-  transition: transform 220ms ease, opacity 220ms ease, filter 220ms ease;
   will-change: transform, opacity, filter;
+`
+
+const CaptionOverlay = styled.div<{ $position: 'bottom' | 'top' }>`
+  position: absolute;
+  left: 50%;
+  ${({ $position }) => ($position === 'top' ? 'top: 1rem;' : 'bottom: 3.6rem;')}
+  transform: translateX(-50%);
+  max-width: 86%;
+  padding: 0.45rem 0.75rem;
+  border-radius: ${({ theme }) => theme.radii.sm};
+  background: rgba(18, 16, 31, 0.72);
+  color: ${({ theme }) => theme.colors.white};
+  font-size: 0.85rem;
+  font-weight: ${({ theme }) => theme.fontWeights.semibold};
+  text-align: center;
+  line-height: 1.3;
+  pointer-events: none;
+  z-index: 4;
+`
+
+const ToolPanel = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: ${({ theme }) => theme.radii.md};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.elevated};
+  min-width: 0;
+`
+
+const ToolHint = styled.p`
+  margin: 0;
+  flex: 1 1 12rem;
+  font-size: 0.75rem;
+  color: ${({ theme }) => theme.colors.textMuted};
+  line-height: 1.4;
+`
+
+const MiniControl = styled.button<{ $active?: boolean }>`
+  appearance: none;
+  border: 1px solid
+    ${({ theme, $active }) => ($active ? theme.colors.primary : theme.colors.border)};
+  background: ${({ theme, $active }) => ($active ? theme.colors.primarySoft : theme.colors.surface)};
+  color: ${({ theme, $active }) => ($active ? theme.colors.primary : theme.colors.ink)};
+  border-radius: ${({ theme }) => theme.radii.full};
+  padding: 0.32rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: ${({ theme }) => theme.fontWeights.semibold};
+  cursor: pointer;
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primaryMuted};
+    color: ${({ theme }) => theme.colors.primary};
+  }
+`
+
+const CaptionInput = styled.input`
+  flex: 1 1 14rem;
+  min-width: 10rem;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.sm};
+  background: ${({ theme }) => theme.colors.surface};
+  color: ${({ theme }) => theme.colors.ink};
+  padding: 0.4rem 0.65rem;
+  font-size: 0.8125rem;
+  font-family: ${({ theme }) => theme.fonts.body};
+
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
 `
 
 const FlashOverlay = styled.div<{ $intensity: number }>`
@@ -62,17 +159,120 @@ const FlashOverlay = styled.div<{ $intensity: number }>`
 const TransportBar = styled.div`
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  gap: 0.65rem;
   padding: 0.65rem 0.85rem;
   background: rgba(18, 16, 31, 0.96);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+`
+
+const SeekBar = styled.div`
+  flex: 1;
+  min-width: 3rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+`
+
+const SeekTrack = styled.div`
+  position: relative;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+`
+
+const SeekFill = styled.div<{ $percent: number }>`
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: ${({ $percent }) => Math.min(100, Math.max(0, $percent))}%;
+  border-radius: 999px;
+  background: ${({ theme }) => theme.colors.primary};
+  pointer-events: none;
+`
+
+const SeekThumb = styled.div<{ $percent: number }>`
+  position: absolute;
+  top: 50%;
+  left: ${({ $percent }) => Math.min(100, Math.max(0, $percent))}%;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: ${({ theme }) => theme.colors.white};
+  box-shadow: 0 0 0 2px ${({ theme }) => theme.colors.primary};
+  pointer-events: none;
+`
+
+const EffectsSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  max-width: 100%;
+`
+
+const EffectsStrip = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  padding-bottom: 0.15rem;
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: ${({ theme }) => theme.colors.border};
+    border-radius: 999px;
+  }
+`
+
+const TimelineBlock = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+  max-width: 100%;
+`
+
+const TimelineViewport = styled.div`
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  border-radius: ${({ theme }) => theme.radii.md};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.elevated};
+  overflow: hidden;
+`
+
+const Toolbar = styled.div`
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: ${({ theme }) => theme.radii.md};
+  background: ${({ theme }) => theme.colors.surface};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 `
 
 const TransportLeft = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.35rem;
+  flex-shrink: 0;
 `
 
 const PlayButton = styled.button`
@@ -93,6 +293,30 @@ const PlayButton = styled.button`
   }
 `
 
+const SkipButton = styled.button`
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 0.25rem;
+  border-radius: ${({ theme }) => theme.radii.sm};
+  font-size: 0.65rem;
+  font-weight: ${({ theme }) => theme.fontWeights.semibold};
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color ${({ theme }) => theme.transitions.fast},
+    background ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.white};
+    background: rgba(255, 255, 255, 0.08);
+  }
+`
+
 const Timecode = styled.span`
   font-family: ${({ theme }) => theme.fonts.mono};
   font-size: 0.75rem;
@@ -104,6 +328,7 @@ const TransportActions = styled.div`
   display: flex;
   align-items: center;
   gap: 0.25rem;
+  flex-shrink: 0;
 `
 
 const TransportBtn = styled.button`
@@ -126,17 +351,6 @@ const TransportBtn = styled.button`
     color: ${({ theme }) => theme.colors.white};
     background: rgba(255, 255, 255, 0.08);
   }
-`
-
-const Toolbar = styled.div`
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.35rem 0;
-  padding: 0.5rem 0.65rem;
-  border-radius: ${({ theme }) => theme.radii.md};
-  background: ${({ theme }) => theme.colors.surface};
-  border: 1px solid ${({ theme }) => theme.colors.border};
 `
 
 const ToolGroup = styled.div`
@@ -173,35 +387,12 @@ const ToolBtn = styled.button<{ $active?: boolean }>`
   }
 `
 
-const EffectsSection = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-`
-
 const EffectsLabel = styled.span`
   font-size: 0.6875rem;
   font-weight: ${({ theme }) => theme.fontWeights.bold};
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.textMuted};
-`
-
-const EffectsStrip = styled.div`
-  display: flex;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding-bottom: 0.15rem;
-  scrollbar-width: thin;
-
-  &::-webkit-scrollbar {
-    height: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: ${({ theme }) => theme.colors.border};
-    border-radius: 999px;
-  }
 `
 
 const EffectChip = styled.button<{ $active?: boolean }>`
@@ -243,12 +434,6 @@ const EffectName = styled.span`
   line-height: 1.2;
 `
 
-const TimelineBlock = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-`
-
 const TimelineMeta = styled.div`
   display: flex;
   align-items: center;
@@ -258,15 +443,6 @@ const TimelineMeta = styled.div`
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.textMuted};
-`
-
-const TimelineViewport = styled.div`
-  position: relative;
-  width: 100%;
-  border-radius: ${({ theme }) => theme.radii.md};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  background: ${({ theme }) => theme.colors.elevated};
-  overflow: hidden;
 `
 
 const Track = styled.div`
@@ -440,18 +616,31 @@ const EFFECT_PRESETS: EffectPreset[] = [
 
 const TRANSITION_PRESETS: TransitionPreset[] = [
   { id: 'none', name: 'None', description: 'No motion', accent: 'linear-gradient(135deg, #e9e4f5, #f5f3ff)' },
-  { id: 'zoom-in', name: 'Zoom in', description: 'Push into frame', accent: 'linear-gradient(135deg, #7c3aed, #1e1b4b)' },
-  { id: 'zoom-out', name: 'Zoom out', description: 'Pull back', accent: 'linear-gradient(135deg, #c4b5fd, #7c3aed)' },
+  { id: 'zoom-in', name: 'Zoom in', description: 'Cinematic push-in', accent: 'linear-gradient(135deg, #7c3aed, #1e1b4b)' },
+  { id: 'zoom-out', name: 'Zoom out', description: 'Cinematic pull-back', accent: 'linear-gradient(135deg, #c4b5fd, #7c3aed)' },
+  { id: 'ken-burns', name: 'Ken Burns', description: 'Slow pan + zoom', accent: 'linear-gradient(135deg, #f59e0b, #7c3aed)' },
   { id: 'fade', name: 'Fade', description: 'Soft opacity', accent: 'linear-gradient(135deg, #1e1b4b, #f5f3ff)' },
   { id: 'slide-left', name: 'Slide ←', description: 'Drift left', accent: 'linear-gradient(90deg, #7c3aed, #a78bfa)' },
   { id: 'slide-right', name: 'Slide →', description: 'Drift right', accent: 'linear-gradient(270deg, #7c3aed, #a78bfa)' },
-  { id: 'ken-burns', name: 'Ken Burns', description: 'Slow pan + zoom', accent: 'linear-gradient(135deg, #f59e0b, #7c3aed)' },
   { id: 'blur', name: 'Blur', description: 'Soft dissolve', accent: 'linear-gradient(135deg, #38bdf8, #c4b5fd)' },
   { id: 'flash', name: 'Flash', description: 'White flash cut', accent: 'linear-gradient(135deg, #ffffff, #7c3aed)' },
 ]
 
+const TRANSITION_SPEED_PRESETS = [
+  { id: 'fast', label: 'Fast', seconds: 0.8 },
+  { id: 'normal', label: 'Normal', seconds: 1.4 },
+  { id: 'smooth', label: 'Smooth', seconds: 2.2 },
+  { id: 'cinematic', label: 'Cinematic', seconds: 3.5 },
+] as const
+
+type TransitionSpeedId = (typeof TRANSITION_SPEED_PRESETS)[number]['id']
+
 const easeInOutCubic = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+
+/** Smoother cinematic curve for zoom push / pull. */
+const easeInOutQuint = (t: number) =>
+  t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
@@ -461,6 +650,17 @@ const formatTime = (seconds: number) => {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
 
+type CropId = 'none' | 'center' | 'top' | 'bottom' | 'tight'
+
+const SPEED_PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const
+const CROP_PRESETS: Array<{ id: CropId; label: string }> = [
+  { id: 'none', label: 'Fit' },
+  { id: 'center', label: 'Center' },
+  { id: 'tight', label: 'Tight' },
+  { id: 'top', label: 'Top' },
+  { id: 'bottom', label: 'Bottom' },
+]
+
 const buildTimelineJson = (
   src: string,
   start: number,
@@ -469,6 +669,15 @@ const buildTimelineJson = (
   segments: Array<{ start: number; end: number }> = [],
   selectedEffect: EffectPreset | null = null,
   videoTransition: TransitionId = 'none',
+  extras: {
+    speed?: number
+    crop?: CropId
+    captionsEnabled?: boolean
+    captionText?: string
+    zoom?: number
+    transitionDuration?: number
+    transitionSpeed?: TransitionSpeedId
+  } = {},
 ) => ({
   timeline: {
     tracks: [
@@ -478,7 +687,16 @@ const buildTimelineJson = (
             asset: { type: 'video', src },
             start,
             length: Math.max(0.1, end - start),
-            transition: videoTransition !== 'none' ? { in: videoTransition, out: videoTransition } : undefined,
+            transition: videoTransition !== 'none'
+              ? {
+                  in: videoTransition,
+                  out: videoTransition,
+                  duration: extras.transitionDuration ?? 2.2,
+                }
+              : undefined,
+            speed: extras.speed ?? 1,
+            crop: extras.crop ?? 'none',
+            zoom: extras.zoom ?? 1,
           },
         ],
       },
@@ -490,8 +708,15 @@ const buildTimelineJson = (
     })),
     effects: selectedEffect ? [{ id: selectedEffect.id, name: selectedEffect.name, filter: selectedEffect.filter }] : [],
     transition: videoTransition !== 'none'
-      ? { type: videoTransition, duration: Math.max(0.1, end - start) }
+      ? {
+          type: videoTransition,
+          duration: extras.transitionDuration ?? 2.2,
+          speed: extras.transitionSpeed ?? 'smooth',
+        }
       : null,
+    captions: extras.captionsEnabled
+      ? [{ text: extras.captionText || '', start, end }]
+      : [],
   },
   output: {
     format: 'mp4',
@@ -505,8 +730,17 @@ const buildTimelineJson = (
     })),
     effect: selectedEffect ? { id: selectedEffect.id, name: selectedEffect.name, filter: selectedEffect.filter } : null,
     transition: videoTransition !== 'none'
-      ? { type: videoTransition, duration: Math.max(0.1, end - start) }
+      ? {
+          type: videoTransition,
+          duration: extras.transitionDuration ?? 2.2,
+          speed: extras.transitionSpeed ?? 'smooth',
+        }
       : null,
+    speed: extras.speed ?? 1,
+    crop: extras.crop ?? 'none',
+    zoom: extras.zoom ?? 1,
+    captionsEnabled: Boolean(extras.captionsEnabled),
+    captionText: extras.captionText || '',
   },
 })
 
@@ -530,7 +764,7 @@ const seekVideoTo = (video: HTMLVideoElement, time: number) => new Promise<void>
   video.currentTime = safeTime
 })
 
-export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function ShotstackEditor(
+export const ShotstackEditor = forwardRef(function ShotstackEditor(
   { file, durationSeconds, onTimelineChange, onCutSaved }: Props,
   ref,
 ) {
@@ -540,13 +774,35 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
   const [trimStart, setTrimStart] = useState(0)
   const [trimEnd, setTrimEnd] = useState(10)
   const [playhead, setPlayhead] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
   const [dragging, setDragging] = useState<'start' | 'end' | null>(null)
   const [keyframes, setKeyframes] = useState<number[]>([])
   const [segments, setSegments] = useState<Array<{ start: number; end: number }>>([])
   const [videoZoom, setVideoZoom] = useState(1)
   const [videoTransition, setVideoTransition] = useState<TransitionId>('none')
+  const [transitionSpeedId, setTransitionSpeedId] = useState<TransitionSpeedId>('smooth')
   const [selectedEffect, setSelectedEffect] = useState<EffectPreset>(EFFECT_PRESETS[0])
   const [activeTool, setActiveTool] = useState<ToolId>('trim')
+  const [playbackSpeed, setPlaybackSpeed] = useState(1)
+  const [cropPreset, setCropPreset] = useState<CropId>('none')
+  const [captionsEnabled, setCaptionsEnabled] = useState(false)
+  const [captionText, setCaptionText] = useState('')
+  const [captionPosition, setCaptionPosition] = useState<'bottom' | 'top'>('bottom')
+  const [toolMessage, setToolMessage] = useState('Drag the purple handles to set in/out points.')
+  const transitionsRef = useRef<HTMLDivElement | null>(null)
+
+  const transitionDuration =
+    TRANSITION_SPEED_PRESETS.find((item) => item.id === transitionSpeedId)?.seconds ?? 2.2
+
+  const editorExtras = {
+    speed: playbackSpeed,
+    crop: cropPreset,
+    captionsEnabled,
+    captionText,
+    zoom: videoZoom,
+    transitionDuration,
+    transitionSpeed: transitionSpeedId,
+  }
 
   const notifyTimelineChange = (json: any) => {
     onTimelineChange?.(json)
@@ -634,7 +890,7 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
     setVideoZoom(1)
     setVideoTransition('none')
 
-    const json = buildTimelineJson(nextUrl, 0, total, autoKeyframes, defaultSegments, selectedEffect, videoTransition)
+    const json = buildTimelineJson(nextUrl, 0, total, autoKeyframes, defaultSegments, selectedEffect, videoTransition, editorExtras)
     notifyTimelineChange(json)
 
     return () => {
@@ -647,9 +903,15 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
 
   useEffect(() => {
     if (!sourceUrl) return
-    const current = buildTimelineJson(sourceUrl, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition)
+    const current = buildTimelineJson(sourceUrl, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition, editorExtras)
     notifyTimelineChange(current)
-  }, [sourceUrl, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition])
+  }, [sourceUrl, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition, playbackSpeed, cropPreset, captionsEnabled, captionText, videoZoom, transitionSpeedId, transitionDuration])
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.playbackRate = playbackSpeed
+    }
+  }, [playbackSpeed, sourceUrl])
 
   useEffect(() => {
     if (!dragging) return
@@ -680,7 +942,7 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
   useImperativeHandle(ref, () => ({
     async getTimelineJson() {
       const src = sourceUrl || fileUrlRef.current || ''
-      return buildTimelineJson(src, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition)
+      return buildTimelineJson(src, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition, editorExtras)
     },
     async saveTrimmedClip() {
       if (!file) return null
@@ -698,8 +960,13 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
         value: trimEnd,
         enumerable: true,
       })
+      Object.defineProperty(savedFile, 'duration', {
+        value: Math.max(0.1, trimEnd - trimStart),
+        enumerable: true,
+      })
 
       onCutSaved?.(savedFile)
+      setToolMessage(`Clip saved · ${formatTime(trimStart)}–${formatTime(trimEnd)}`)
       return savedFile
     },
   }))
@@ -719,6 +986,25 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
       return [...merged].sort((a, b) => a - b)
     })
     setActiveTool('effect')
+    setToolMessage(`Keyframe added at ${formatTime(nextTime)}`)
+  }
+
+  const removeNearestKeyframe = () => {
+    if (!keyframes.length) {
+      setToolMessage('No keyframes to remove.')
+      return
+    }
+    let nearest = keyframes[0]
+    let best = Math.abs(playhead - nearest)
+    for (const time of keyframes) {
+      const dist = Math.abs(playhead - time)
+      if (dist < best) {
+        best = dist
+        nearest = time
+      }
+    }
+    setKeyframes((current) => current.filter((time) => time !== nearest))
+    setToolMessage(`Removed keyframe at ${formatTime(nearest)}`)
   }
 
   const splitAtPlayhead = () => {
@@ -736,33 +1022,168 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
       return next.length ? next : [{ start: 0, end: totalDuration }]
     })
     setActiveTool('split')
+    setToolMessage(`Split at ${formatTime(splitPoint)}`)
+  }
+
+  const cutAtPlayhead = () => {
+    const cutPoint = clamp(playhead, 0, totalDuration)
+    const active = segments.find((segment) => segment.start <= cutPoint && cutPoint <= segment.end)
+
+    if (active && active.end - active.start > 0.6) {
+      // Remove a short bite around the playhead from the active segment
+      const bite = 0.35
+      const leftEnd = Math.max(active.start, cutPoint - bite)
+      const rightStart = Math.min(active.end, cutPoint + bite)
+      setSegments((current) => {
+        const next: Array<{ start: number; end: number }> = []
+        for (const segment of current) {
+          if (segment !== active) {
+            next.push(segment)
+            continue
+          }
+          if (leftEnd - segment.start >= 0.25) next.push({ start: segment.start, end: leftEnd })
+          if (segment.end - rightStart >= 0.25) next.push({ start: rightStart, end: segment.end })
+        }
+        return next.length ? next : [{ start: trimStart, end: trimEnd }]
+      })
+      setToolMessage(`Cut gap around ${formatTime(cutPoint)}`)
+    } else {
+      // Fallback: tighten trim to the kept selection / playhead side
+      if (cutPoint - trimStart > trimEnd - cutPoint) {
+        setTrimEnd(Math.max(trimStart + 0.3, cutPoint))
+      } else {
+        setTrimStart(Math.min(trimEnd - 0.3, cutPoint))
+      }
+      setToolMessage(`Cut applied · trim updated at ${formatTime(cutPoint)}`)
+    }
+    setActiveTool('cut')
+  }
+
+  const activateTrim = () => {
+    setActiveTool('trim')
+    setToolMessage('Trim mode: drag the purple handles on the timeline to set in/out.')
   }
 
   const handleZoom = (direction: 'in' | 'out') => {
     setVideoZoom((value) => {
       const next = direction === 'in' ? value + 0.15 : value - 0.15
-      return clamp(next, 0.8, 2.2)
+      const clamped = clamp(next, 0.8, 2.4)
+      setToolMessage(`Zoom ${clamped.toFixed(2)}×`)
+      return clamped
     })
     setActiveTool('zoom')
+  }
+
+  const cycleCrop = (next?: CropId) => {
+    if (next) {
+      setCropPreset(next)
+      setActiveTool('crop')
+      setToolMessage(`Crop: ${CROP_PRESETS.find((c) => c.id === next)?.label ?? next}`)
+      return
+    }
+    const index = CROP_PRESETS.findIndex((c) => c.id === cropPreset)
+    const picked = CROP_PRESETS[(index + 1) % CROP_PRESETS.length]
+    setCropPreset(picked.id)
+    setActiveTool('crop')
+    setToolMessage(`Crop: ${picked.label}`)
+  }
+
+  const setSpeed = (speed: number) => {
+    setPlaybackSpeed(speed)
+    setActiveTool('speed')
+    setToolMessage(`Playback speed ${speed}×`)
+    if (videoRef.current) videoRef.current.playbackRate = speed
+  }
+
+  const cycleSpeed = () => {
+    const index = SPEED_PRESETS.findIndex((value) => value === playbackSpeed)
+    const next = SPEED_PRESETS[(index + 1) % SPEED_PRESETS.length]
+    setSpeed(next)
+  }
+
+  const toggleCaptions = () => {
+    setCaptionsEnabled((value) => {
+      const next = !value
+      setToolMessage(next ? 'Captions on — edit the text below.' : 'Captions off')
+      if (next && !captionText.trim()) {
+        setCaptionText('Your caption here')
+      }
+      return next
+    })
+    setActiveTool('caption')
+  }
+
+  const focusTransitions = () => {
+    setActiveTool('transition')
+    setToolMessage('Pick Zoom in / Zoom out, then set transition speed below.')
+    transitionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }
+
+  const setTransitionSpeed = (speedId: TransitionSpeedId) => {
+    setTransitionSpeedId(speedId)
+    const seconds = TRANSITION_SPEED_PRESETS.find((item) => item.id === speedId)?.seconds ?? 2.2
+    setActiveTool('transition')
+    setToolMessage(`Transition speed: ${speedId} (${seconds.toFixed(1)}s)`)
   }
 
   const applyTransition = (transitionId: TransitionId) => {
     setVideoTransition(transitionId)
     setActiveTool('transition')
 
+    // Zoom transitions look best a bit slower — nudge to cinematic if still on Fast
+    if ((transitionId === 'zoom-in' || transitionId === 'zoom-out') && transitionSpeedId === 'fast') {
+      setTransitionSpeedId('cinematic')
+    }
+
+    const speedLabel =
+      TRANSITION_SPEED_PRESETS.find((item) => item.id === (
+        (transitionId === 'zoom-in' || transitionId === 'zoom-out') && transitionSpeedId === 'fast'
+          ? 'cinematic'
+          : transitionSpeedId
+      ))?.seconds ?? transitionDuration
+
+    setToolMessage(
+      transitionId === 'none'
+        ? 'Transition cleared'
+        : `${TRANSITION_PRESETS.find((t) => t.id === transitionId)?.name ?? transitionId} · ${speedLabel.toFixed(1)}s — hit play to preview`,
+    )
+
     if (transitionId === 'none') return
 
-    const startTime = 0
-    const endTime = Number(totalDuration.toFixed(2))
+    const startTime = Number(trimStart.toFixed(2))
+    const endTime = Number(trimEnd.toFixed(2))
     setKeyframes((current) => {
       const merged = [...current, startTime, endTime].filter((value, index, arr) => arr.indexOf(value) === index)
       return [...merged].sort((a, b) => a - b)
     })
   }
 
+  const seekToTime = (nextTime: number) => {
+    const clamped = clamp(nextTime, 0, totalDuration)
+    setPlayhead(clamped)
+    if (videoRef.current) {
+      videoRef.current.currentTime = clamped
+    }
+  }
+
+  const seekBy = (deltaSeconds: number) => {
+    const current = videoRef.current?.currentTime ?? playhead
+    seekToTime(current + deltaSeconds)
+  }
+
   const togglePreview = async () => {
     if (!videoRef.current) return
     if (videoRef.current.paused) {
+      // Restart from start when already at the end
+      if (videoRef.current.ended || playhead >= totalDuration - 0.05) {
+        videoRef.current.currentTime = trimStart
+        setPlayhead(trimStart)
+      } else if (videoTransition === 'zoom-in') {
+        // For zoom transitions, restart near the transition window so speed is obvious
+        videoRef.current.currentTime = trimStart
+      } else if (videoTransition === 'zoom-out') {
+        videoRef.current.currentTime = Math.max(trimStart, trimEnd - transitionDuration)
+      }
       await videoRef.current.play()
     } else {
       videoRef.current.pause()
@@ -773,15 +1194,28 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
     const track = event.currentTarget
     const rect = track.getBoundingClientRect()
     const ratio = clamp((event.clientX - rect.left) / rect.width, 0, 1)
-    const nextTime = ratio * totalDuration
-    setPlayhead(nextTime)
-    if (videoRef.current) {
-      videoRef.current.currentTime = nextTime
-    }
+    seekToTime(ratio * totalDuration)
   }
 
-  const progress = clamp(playhead / Math.max(0.1, totalDuration), 0, 1)
-  const eased = easeInOutCubic(progress)
+  // Transition progress is driven by the user-selected duration (not the whole clip).
+  const clipSpan = Math.max(0.2, trimEnd - trimStart)
+  const localDuration = clamp(transitionDuration, 0.4, clipSpan)
+
+  let rawTransitionProgress = 0
+  if (videoTransition === 'none') {
+    rawTransitionProgress = 0
+  } else if (videoTransition === 'zoom-out') {
+    const windowStart = Math.max(trimStart, trimEnd - localDuration)
+    rawTransitionProgress = clamp((playhead - windowStart) / localDuration, 0, 1)
+  } else if (videoTransition === 'ken-burns') {
+    rawTransitionProgress = clamp((playhead - trimStart) / clipSpan, 0, 1)
+  } else {
+    // zoom-in, fade, slides, blur, flash — play over the opening window
+    rawTransitionProgress = clamp((playhead - trimStart) / localDuration, 0, 1)
+  }
+
+  const eased = easeInOutQuint(rawTransitionProgress)
+  const softEased = easeInOutCubic(rawTransitionProgress)
 
   let effectiveZoom = videoZoom
   let effectiveTranslateX = 0
@@ -791,56 +1225,48 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
   let flashIntensity = 0
 
   switch (videoTransition) {
-    case 'zoom-in':
-      effectiveZoom = clamp(1 + eased * 0.85, 1, 1.85)
-      effectiveTranslateX = (0.5 - (progress - 0.5)) * 14
-      effectiveTranslateY = (0.5 - progress) * 10
+    case 'zoom-in': {
+      // Cinematic push-in: gentle start, confident finish
+      const zoomAmount = 0.55
+      effectiveZoom = clamp(1 + eased * zoomAmount, 1, 1.55)
+      effectiveTranslateX = (1 - eased) * -10
+      effectiveTranslateY = (1 - eased) * 6
       break
-    case 'zoom-out':
-      effectiveZoom = clamp(1.75 - eased * 0.75, 1, 1.75)
-      effectiveTranslateX = (progress - 0.5) * 16
-      effectiveTranslateY = (progress - 0.5) * 8
+    }
+    case 'zoom-out': {
+      // Start tight, pull back to reveal
+      const zoomAmount = 0.55
+      effectiveZoom = clamp(1 + zoomAmount - eased * zoomAmount, 1, 1.55)
+      effectiveTranslateX = eased * 8
+      effectiveTranslateY = eased * -4
       break
+    }
     case 'fade':
-      // Fade in at start, fade out at end
-      effectiveOpacity = progress < 0.15
-        ? easeInOutCubic(progress / 0.15)
-        : progress > 0.85
-          ? easeInOutCubic((1 - progress) / 0.15)
-          : 1
+      effectiveOpacity = softEased
       break
     case 'slide-left':
-      effectiveTranslateX = (1 - eased) * 120 - 20
-      effectiveOpacity = clamp(0.35 + eased * 0.65, 0.35, 1)
+      effectiveTranslateX = (1 - eased) * 56
+      effectiveOpacity = clamp(0.4 + eased * 0.6, 0.4, 1)
       break
     case 'slide-right':
-      effectiveTranslateX = -(1 - eased) * 120 + 20
-      effectiveOpacity = clamp(0.35 + eased * 0.65, 0.35, 1)
+      effectiveTranslateX = -(1 - eased) * 56
+      effectiveOpacity = clamp(0.4 + eased * 0.6, 0.4, 1)
       break
     case 'ken-burns':
-      effectiveZoom = clamp(1 + eased * 0.35, 1, 1.35)
-      effectiveTranslateX = Math.sin(progress * Math.PI) * 28
-      effectiveTranslateY = (progress - 0.5) * 18
+      effectiveZoom = clamp(1 + softEased * 0.32, 1, 1.32)
+      effectiveTranslateX = Math.sin(rawTransitionProgress * Math.PI) * 18
+      effectiveTranslateY = (rawTransitionProgress - 0.5) * 12
       break
     case 'blur': {
-      const blurAmt = progress < 0.2
-        ? (1 - progress / 0.2) * 8
-        : progress > 0.8
-          ? ((progress - 0.8) / 0.2) * 8
-          : 0
+      const blurAmt = (1 - softEased) * 7
       transitionFilterExtra = blurAmt > 0.05 ? ` blur(${blurAmt.toFixed(2)}px)` : ''
-      effectiveOpacity = progress < 0.2
-        ? 0.4 + (progress / 0.2) * 0.6
-        : progress > 0.8
-          ? 1 - ((progress - 0.8) / 0.2) * 0.45
-          : 1
+      effectiveOpacity = clamp(0.45 + softEased * 0.55, 0.45, 1)
       break
     }
     case 'flash': {
-      // Flash peaks near start and mid-cut moments
-      const pulse = Math.sin(progress * Math.PI * 2)
-      flashIntensity = clamp(pulse * 0.55, 0, 0.7)
-      effectiveZoom = clamp(1 + Math.abs(pulse) * 0.08, 1, 1.08)
+      const pulse = Math.sin(rawTransitionProgress * Math.PI)
+      flashIntensity = clamp(pulse * 0.65, 0, 0.75)
+      effectiveZoom = clamp(1 + Math.abs(pulse) * 0.1, 1, 1.1)
       break
     }
     default:
@@ -853,11 +1279,6 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
   const keyframePositions = sortedKeyframes
     .filter((time) => time >= 0 && time <= totalDuration)
     .map((time) => (time / totalDuration) * 100)
-
-  const selectTool = (tool: ToolId, action?: () => void) => {
-    action?.()
-    setActiveTool(tool)
-  }
 
   const activeTransition = TRANSITION_PRESETS.find((item) => item.id === videoTransition) ?? TRANSITION_PRESETS[0]
 
@@ -875,27 +1296,55 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
             $translateY={effectiveTranslateY}
             $opacity={effectiveOpacity}
             $filter={combinedFilter}
+            $crop={cropPreset}
             onLoadedMetadata={() => {
               void detectKeyMoments()
+              if (videoRef.current) videoRef.current.playbackRate = playbackSpeed
             }}
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+            onEnded={() => setIsPlaying(false)}
             onTimeUpdate={(event) => {
               setPlayhead(event.currentTarget.currentTime)
             }}
           />
           <FlashOverlay $intensity={flashIntensity} />
+          {captionsEnabled && captionText.trim() && (
+            <CaptionOverlay $position={captionPosition}>{captionText}</CaptionOverlay>
+          )}
         </VideoStage>
 
         <TransportBar>
           <TransportLeft>
-            <PlayButton type="button" onClick={togglePreview} aria-label="Play or pause">
-              ▶
+            <SkipButton type="button" onClick={() => seekBy(-5)} aria-label="Back 5 seconds" title="Back 5s">
+              −5s
+            </SkipButton>
+            <PlayButton type="button" onClick={togglePreview} aria-label={isPlaying ? 'Pause' : 'Play'}>
+              {isPlaying ? '❚❚' : '▶'}
             </PlayButton>
+            <SkipButton type="button" onClick={() => seekBy(5)} aria-label="Forward 5 seconds" title="Forward 5s">
+              +5s
+            </SkipButton>
             <Timecode>
               {formatTime(playhead)}
               {' / '}
               {formatTime(totalDuration)}
+              {playbackSpeed !== 1 ? ` · ${playbackSpeed}×` : ''}
             </Timecode>
           </TransportLeft>
+          <SeekBar
+            role="slider"
+            aria-label="Seek"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(totalDuration)}
+            aria-valuenow={Math.round(playhead)}
+            onClick={seekToClick}
+          >
+            <SeekTrack>
+              <SeekFill $percent={playheadPercent} />
+              <SeekThumb $percent={playheadPercent} />
+            </SeekTrack>
+          </SeekBar>
           <TransportActions>
             <TransportBtn type="button" onClick={() => handleZoom('out')} aria-label="Zoom out">
               −
@@ -910,7 +1359,7 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
               type="button"
               onClick={async () => {
                 const handle = ref && typeof ref !== 'function' ? ref.current : null
-                await (handle as ShotstackEditorHandle | null)?.saveTrimmedClip()
+                await handle?.saveTrimmedClip()
               }}
             >
               Save clip
@@ -921,44 +1370,153 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
 
       <Toolbar>
         <ToolGroup>
-          <ToolBtn type="button" $active={activeTool === 'trim'} onClick={() => selectTool('trim')}>
+          <ToolBtn type="button" $active={activeTool === 'trim'} onClick={activateTrim}>
             Trim
           </ToolBtn>
-          <ToolBtn type="button" $active={activeTool === 'split'} onClick={() => selectTool('split', splitAtPlayhead)}>
+          <ToolBtn type="button" $active={activeTool === 'split'} onClick={splitAtPlayhead}>
             Split
           </ToolBtn>
-          <ToolBtn type="button" $active={activeTool === 'cut'} onClick={() => selectTool('cut')}>
+          <ToolBtn type="button" $active={activeTool === 'cut'} onClick={cutAtPlayhead}>
             Cut
           </ToolBtn>
         </ToolGroup>
         <ToolGroup>
-          <ToolBtn type="button" $active={activeTool === 'crop'} onClick={() => selectTool('crop')}>
+          <ToolBtn type="button" $active={activeTool === 'crop'} onClick={() => cycleCrop()}>
             Crop
           </ToolBtn>
-          <ToolBtn type="button" $active={activeTool === 'zoom'} onClick={() => selectTool('zoom', () => handleZoom('in'))}>
+          <ToolBtn type="button" $active={activeTool === 'zoom'} onClick={() => handleZoom('in')}>
             Zoom
           </ToolBtn>
-          <ToolBtn type="button" $active={activeTool === 'transition'} onClick={() => selectTool('transition')}>
+          <ToolBtn type="button" $active={activeTool === 'transition'} onClick={focusTransitions}>
             Transition
           </ToolBtn>
         </ToolGroup>
         <ToolGroup>
-          <ToolBtn type="button" $active={activeTool === 'speed'} onClick={() => selectTool('speed')}>
+          <ToolBtn type="button" $active={activeTool === 'speed'} onClick={cycleSpeed}>
             Speed
           </ToolBtn>
-          <ToolBtn type="button" $active={activeTool === 'caption'} onClick={() => selectTool('caption')}>
+          <ToolBtn type="button" $active={activeTool === 'caption'} onClick={toggleCaptions}>
             Captions
           </ToolBtn>
-          <ToolBtn type="button" $active={activeTool === 'effect'} onClick={() => selectTool('effect', addKeyframeAtPlayhead)}>
+          <ToolBtn type="button" $active={activeTool === 'effect'} onClick={addKeyframeAtPlayhead}>
             Keyframe
           </ToolBtn>
         </ToolGroup>
       </Toolbar>
 
-      <EffectsSection>
+      <ToolPanel>
+        <ToolHint>{toolMessage}</ToolHint>
+
+        {activeTool === 'trim' && (
+          <>
+            <MiniControl type="button" onClick={() => { setTrimStart(0); setTrimEnd(totalDuration); setToolMessage('Trim reset to full clip') }}>
+              Reset trim
+            </MiniControl>
+            <MiniControl type="button" onClick={() => { setTrimStart(playhead); setToolMessage(`In point → ${formatTime(playhead)}`) }}>
+              Mark in
+            </MiniControl>
+            <MiniControl type="button" onClick={() => { setTrimEnd(Math.max(trimStart + 0.3, playhead)); setToolMessage(`Out point → ${formatTime(playhead)}`) }}>
+              Mark out
+            </MiniControl>
+          </>
+        )}
+
+        {activeTool === 'split' && (
+          <MiniControl type="button" onClick={splitAtPlayhead}>Split at playhead</MiniControl>
+        )}
+
+        {activeTool === 'cut' && (
+          <MiniControl type="button" onClick={cutAtPlayhead}>Cut at playhead</MiniControl>
+        )}
+
+        {activeTool === 'crop' &&
+          CROP_PRESETS.map((crop) => (
+            <MiniControl
+              key={crop.id}
+              type="button"
+              $active={cropPreset === crop.id}
+              onClick={() => cycleCrop(crop.id)}
+            >
+              {crop.label}
+            </MiniControl>
+          ))}
+
+        {activeTool === 'zoom' && (
+          <>
+            <MiniControl type="button" onClick={() => handleZoom('out')}>Zoom −</MiniControl>
+            <MiniControl type="button" onClick={() => handleZoom('in')}>Zoom +</MiniControl>
+            <MiniControl type="button" onClick={() => { setVideoZoom(1); setToolMessage('Zoom reset to 1×') }}>Reset</MiniControl>
+          </>
+        )}
+
+        {activeTool === 'speed' &&
+          SPEED_PRESETS.map((speed) => (
+            <MiniControl
+              key={speed}
+              type="button"
+              $active={playbackSpeed === speed}
+              onClick={() => setSpeed(speed)}
+            >
+              {speed}×
+            </MiniControl>
+          ))}
+
+        {activeTool === 'caption' && (
+          <>
+            <MiniControl type="button" $active={captionsEnabled} onClick={toggleCaptions}>
+              {captionsEnabled ? 'On' : 'Off'}
+            </MiniControl>
+            <MiniControl
+              type="button"
+              $active={captionPosition === 'bottom'}
+              onClick={() => setCaptionPosition('bottom')}
+            >
+              Bottom
+            </MiniControl>
+            <MiniControl
+              type="button"
+              $active={captionPosition === 'top'}
+              onClick={() => setCaptionPosition('top')}
+            >
+              Top
+            </MiniControl>
+            <CaptionInput
+              value={captionText}
+              onChange={(event) => setCaptionText(event.target.value)}
+              placeholder="Caption text"
+            />
+          </>
+        )}
+
+        {activeTool === 'effect' && (
+          <>
+            <MiniControl type="button" onClick={addKeyframeAtPlayhead}>Add keyframe</MiniControl>
+            <MiniControl type="button" onClick={removeNearestKeyframe}>Remove nearest</MiniControl>
+          </>
+        )}
+
+        {activeTool === 'transition' && (
+          <>
+            {TRANSITION_SPEED_PRESETS.map((speed) => (
+              <MiniControl
+                key={speed.id}
+                type="button"
+                $active={transitionSpeedId === speed.id}
+                onClick={() => setTransitionSpeed(speed.id)}
+              >
+                {speed.label} · {speed.seconds}s
+              </MiniControl>
+            ))}
+          </>
+        )}
+      </ToolPanel>
+
+      <EffectsSection ref={transitionsRef}>
         <EffectsLabel>
           Transitions
-          {videoTransition !== 'none' ? ` · ${activeTransition.name}` : ''}
+          {videoTransition !== 'none'
+            ? ` · ${activeTransition.name} · ${transitionDuration.toFixed(1)}s`
+            : ''}
         </EffectsLabel>
         <EffectsStrip>
           {TRANSITION_PRESETS.map((transition) => (
@@ -974,6 +1532,25 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
             </EffectChip>
           ))}
         </EffectsStrip>
+        {videoTransition !== 'none' && (
+          <ToolPanel style={{ marginTop: '0.35rem' }}>
+            <ToolHint>
+              Transition speed controls how long the motion lasts.
+              {(videoTransition === 'zoom-in' || videoTransition === 'zoom-out') &&
+                ' Zoom in/out look best on Smooth or Cinematic.'}
+            </ToolHint>
+            {TRANSITION_SPEED_PRESETS.map((speed) => (
+              <MiniControl
+                key={`speed-${speed.id}`}
+                type="button"
+                $active={transitionSpeedId === speed.id}
+                onClick={() => setTransitionSpeed(speed.id)}
+              >
+                {speed.label}
+              </MiniControl>
+            ))}
+          </ToolPanel>
+        )}
       </EffectsSection>
 
       <EffectsSection>

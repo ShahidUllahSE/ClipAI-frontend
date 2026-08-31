@@ -67,14 +67,33 @@ export const projectsApi = {
       body: form,
     })
 
+    let secondaryUploadId: string | undefined
+    if (input.secondaryFile) {
+      const formB = new FormData()
+      formB.append('file', input.secondaryFile)
+      formB.append(
+        'durationSeconds',
+        String(input.secondaryDurationSeconds ?? 0),
+      )
+      const uploadB = await apiFetch<{
+        upload: { id: string }
+      }>('/uploads', {
+        method: 'POST',
+        body: formB,
+      })
+      secondaryUploadId = uploadB.upload.id
+    }
+
     const data = await apiFetch<ProjectResponse>('/projects', {
       method: 'POST',
       body: JSON.stringify({
         uploadId: uploadData.upload.id,
+        secondaryUploadId,
         mode: input.mode,
         options: input.options,
         title: input.title,
-        durationSeconds: input.durationSeconds,
+        durationSeconds:
+          input.durationSeconds + (input.secondaryDurationSeconds ?? 0),
       }),
     })
     return data.project

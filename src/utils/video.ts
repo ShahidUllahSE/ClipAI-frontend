@@ -26,6 +26,8 @@ export function modeLabel(mode: EditingModeId) {
       return 'Rapid-cut'
     case 'asmr':
       return 'ASMR & unboxing'
+    case 'ai-combine':
+      return 'AI Combine'
   }
 }
 

@@ -24,6 +24,9 @@ const fade = keyframes`
 const Page = styled.div`
   animation: ${fade} 0.35s ease both;
   max-width: 70rem;
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 `
 
 const Header = styled.header`
@@ -68,20 +71,27 @@ const Lead = styled.p`
 const Layout = styled.form`
   display: grid;
   gap: 0.85rem;
+  width: 100%;
+  min-width: 0;
 
   @media (min-width: ${({ theme }) => theme.breakpoints.lg}) {
-    grid-template-columns: minmax(0, 1fr) minmax(19rem, 0.95fr);
+    grid-template-columns: minmax(0, 1.15fr) minmax(17rem, 0.85fr);
     align-items: start;
+  }
+
+  > * {
+    min-width: 0;
   }
 `
 
 const Panel = styled.section`
-  position: relative;
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: 1rem;
   background: ${({ theme }) => theme.colors.surface};
   box-shadow: ${({ theme }) => theme.shadows.sm};
   overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
 `
 
 const PanelHead = styled.div`
@@ -118,15 +128,24 @@ const Step = styled.span`
 `
 
 const PanelBody = styled.div`
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
   padding: 0.85rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 `
 
 const Stack = styled.div`
   display: grid;
   gap: 0.85rem;
+  min-width: 0;
+  max-width: 100%;
+`
+
+const EditorShell = styled.div`
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 `
 
 const Dropzone = styled.div<{ $active: boolean; $hasFile: boolean }>`
@@ -329,14 +348,11 @@ const Toggle = styled.label`
 `
 
 const Footer = styled.div`
-  position: relative;
-  z-index: 1;
-  margin-top: auto;
+  margin-top: 0.75rem;
   padding-top: 0.75rem;
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   display: grid;
   gap: 0.55rem;
-  background: ${({ theme }) => theme.colors.surface};
 `
 
 const Progress = styled.div`
@@ -373,6 +389,12 @@ const MODES: { id: EditingModeId; name: string; text: string; live: boolean }[] 
       text: 'Keep product sounds, trim empty waits.',
       live: true,
     },
+    {
+      id: 'ai-combine',
+      name: 'AI Combine',
+      text: 'Gemini finds beautiful moments in both clips and blends them.',
+      live: true,
+    },
   ]
 
 export function NewProjectPage() {
@@ -380,7 +402,10 @@ export function NewProjectPage() {
   const { create, process } = useProjects()
   const [file, setFile] = useState<File | null>(null)
   const [duration, setDuration] = useState(0)
+  const [fileB, setFileB] = useState<File | null>(null)
+  const [durationB, setDurationB] = useState(0)
   const [drag, setDrag] = useState(false)
+  const [dragB, setDragB] = useState(false)
   const [mode, setMode] = useState<EditingModeId>('talking-head')
   const [options, setOptions] = useState<ProjectOptions>(DEFAULT_PROJECT_OPTIONS)
   const [title, setTitle] = useState('')
@@ -434,11 +459,32 @@ export function NewProjectPage() {
     [title],
   )
 
+  const onFileB = useCallback(async (next: File | null) => {
+    setError('')
+    setFileB(null)
+    setDurationB(0)
+    if (!next) return
+    const result = await validateVideoFile(next)
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    setFileB(next)
+    setDurationB(result.durationSeconds)
+  }, [])
+
   const onDrop = (event: DragEvent) => {
     event.preventDefault()
     setDrag(false)
     const next = event.dataTransfer.files?.[0]
     if (next) void onFile(next)
+  }
+
+  const onDropB = (event: DragEvent) => {
+    event.preventDefault()
+    setDragB(false)
+    const next = event.dataTransfer.files?.[0]
+    if (next) void onFileB(next)
   }
 
   const handleTimelineChange = useCallback(
@@ -454,6 +500,10 @@ export function NewProjectPage() {
       setError('Choose a video file to upload.')
       return
     }
+    if (mode === 'ai-combine' && !fileB) {
+      setError('AI Combine needs a second video.')
+      return
+    }
     setBusy(true)
     setError('')
     setUploadProgress(15)
@@ -464,7 +514,10 @@ export function NewProjectPage() {
       }
       const project = await create({
         file,
+        secondaryFile: mode === 'ai-combine' ? fileB ?? undefined : undefined,
         durationSeconds: duration,
+        secondaryDurationSeconds:
+          mode === 'ai-combine' ? durationB : undefined,
         mode,
         options,
         title: title.trim() || undefined,
@@ -486,12 +539,13 @@ export function NewProjectPage() {
           <Eyebrow>Studio</Eyebrow>
           <Title>New video project</Title>
           <Lead>
-            Upload a clip, pick a mode, tune options, and submit for AI editing.
+            Pick a mode, upload your clip(s), tune options, and submit for AI
+            editing. Use <strong>AI Combine</strong> to upload two videos.
           </Lead>
         </TitleBlock>
         <Button
           type="button"
-          disabled={busy || !file}
+          disabled={busy || !file || (mode === 'ai-combine' && !fileB)}
           onClick={() => {
             const form = document.getElementById(
               'new-project-form',
@@ -507,8 +561,45 @@ export function NewProjectPage() {
         <Stack>
           <Panel>
             <PanelHead>
-              <PanelTitle>Source upload</PanelTitle>
+              <PanelTitle>Editing mode</PanelTitle>
               <Step>1</Step>
+            </PanelHead>
+            <PanelBody>
+              <ModeGrid>
+                {MODES.map((item) => (
+                  <ModeOption key={item.id} $active={mode === item.id}>
+                    <input
+                      type="radio"
+                      name="mode"
+                      checked={mode === item.id}
+                      onChange={() => setMode(item.id)}
+                    />
+                    <div>
+                      <strong>
+                        {item.name}
+                        {item.live ? ' · live' : ' · preview'}
+                      </strong>
+                      <ModeText>{item.text}</ModeText>
+                    </div>
+                  </ModeOption>
+                ))}
+              </ModeGrid>
+              {mode === 'ai-combine' && (
+                <HelpText style={{ marginBottom: 0 }}>
+                  AI Combine samples frames from both videos, lets Gemini pick
+                  the most beautiful / important moments, then FFmpeg cuts and
+                  blends them with cinematic transitions.
+                </HelpText>
+              )}
+            </PanelBody>
+          </Panel>
+
+          <Panel>
+            <PanelHead>
+              <PanelTitle>
+                {mode === 'ai-combine' ? 'Video A' : 'Source upload'}
+              </PanelTitle>
+              <Step>2</Step>
             </PanelHead>
             <PanelBody>
               <Dropzone
@@ -561,13 +652,62 @@ export function NewProjectPage() {
             </PanelBody>
           </Panel>
 
-              {file && (
+          {mode === 'ai-combine' && (
+            <Panel>
+              <PanelHead>
+                <PanelTitle>Video B</PanelTitle>
+                <Step>2b</Step>
+              </PanelHead>
+              <PanelBody>
+                <Dropzone
+                  $active={dragB}
+                  $hasFile={Boolean(fileB)}
+                  onDragEnter={(e) => {
+                    e.preventDefault()
+                    setDragB(true)
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDragLeave={() => setDragB(false)}
+                  onDrop={onDropB}
+                  onClick={() => document.getElementById('video-file-b')?.click()}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      document.getElementById('video-file-b')?.click()
+                    }
+                  }}
+                >
+                  <div>
+                    <DropIcon aria-hidden>{fileB ? '✓' : '↑'}</DropIcon>
+                    <DropTitle>
+                      {fileB ? fileB.name : 'Drop second video or browse'}
+                    </DropTitle>
+                    <DropMeta>
+                      {fileB
+                        ? `${formatBytes(fileB.size)} · ${formatDuration(durationB)}`
+                        : 'Required for AI Combine'}
+                    </DropMeta>
+                  </div>
+                </Dropzone>
+                <HiddenInput
+                  id="video-file-b"
+                  type="file"
+                  accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm"
+                  onChange={(e) => void onFileB(e.target.files?.[0] ?? null)}
+                />
+              </PanelBody>
+            </Panel>
+          )}
+
+              {file && mode !== 'ai-combine' && (
             <Panel>
               <PanelHead>
                 <PanelTitle>Edit video</PanelTitle>
                 <Step>T</Step>
               </PanelHead>
               <PanelBody>
+                <EditorShell>
                 <ShotstackEditor
                   ref={editorRef}
                   file={file}
@@ -601,37 +741,10 @@ export function NewProjectPage() {
                     Cut & save clip
                   </Button>
                 </div>
+                </EditorShell>
               </PanelBody>
             </Panel>
           )}
-
-          <Panel>
-            <PanelHead>
-              <PanelTitle>Editing mode</PanelTitle>
-              <Step>2</Step>
-            </PanelHead>
-            <PanelBody>
-              <ModeGrid>
-                {MODES.map((item) => (
-                  <ModeOption key={item.id} $active={mode === item.id}>
-                    <input
-                      type="radio"
-                      name="mode"
-                      checked={mode === item.id}
-                      onChange={() => setMode(item.id)}
-                    />
-                    <div>
-                      <strong>
-                        {item.name}
-                        {item.live ? ' · live' : ' · preview'}
-                      </strong>
-                      <ModeText>{item.text}</ModeText>
-                    </div>
-                  </ModeOption>
-                ))}
-              </ModeGrid>
-            </PanelBody>
-          </Panel>
         </Stack>
 
         <Panel>
