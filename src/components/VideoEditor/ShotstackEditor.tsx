@@ -764,7 +764,7 @@ const seekVideoTo = (video: HTMLVideoElement, time: number) => new Promise<void>
   video.currentTime = safeTime
 })
 
-export const ShotstackEditor = forwardRef(function ShotstackEditor(
+export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function ShotstackEditor(
   { file, durationSeconds, onTimelineChange, onCutSaved }: Props,
   ref,
 ) {
@@ -939,36 +939,38 @@ export const ShotstackEditor = forwardRef(function ShotstackEditor(
     }
   }, [dragging, trimStart, trimEnd, durationSeconds, sourceUrl])
 
+  const saveTrimmedClip = async (): Promise<File | null> => {
+    if (!file) return null
+
+    const savedFile = new File([file], `${file.name.replace(/\.[^.]+$/, '')}-cut.mp4`, {
+      type: file.type || 'video/mp4',
+      lastModified: Date.now(),
+    })
+
+    Object.defineProperty(savedFile, 'trimStart', {
+      value: trimStart,
+      enumerable: true,
+    })
+    Object.defineProperty(savedFile, 'trimEnd', {
+      value: trimEnd,
+      enumerable: true,
+    })
+    Object.defineProperty(savedFile, 'duration', {
+      value: Math.max(0.1, trimEnd - trimStart),
+      enumerable: true,
+    })
+
+    onCutSaved?.(savedFile)
+    setToolMessage(`Clip saved · ${formatTime(trimStart)}–${formatTime(trimEnd)}`)
+    return savedFile
+  }
+
   useImperativeHandle(ref, () => ({
     async getTimelineJson() {
       const src = sourceUrl || fileUrlRef.current || ''
       return buildTimelineJson(src, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition, editorExtras)
     },
-    async saveTrimmedClip() {
-      if (!file) return null
-
-      const savedFile = new File([file], `${file.name.replace(/\.[^.]+$/, '')}-cut.mp4`, {
-        type: file.type || 'video/mp4',
-        lastModified: Date.now(),
-      })
-
-      Object.defineProperty(savedFile, 'trimStart', {
-        value: trimStart,
-        enumerable: true,
-      })
-      Object.defineProperty(savedFile, 'trimEnd', {
-        value: trimEnd,
-        enumerable: true,
-      })
-      Object.defineProperty(savedFile, 'duration', {
-        value: Math.max(0.1, trimEnd - trimStart),
-        enumerable: true,
-      })
-
-      onCutSaved?.(savedFile)
-      setToolMessage(`Clip saved · ${formatTime(trimStart)}–${formatTime(trimEnd)}`)
-      return savedFile
-    },
+    saveTrimmedClip,
   }))
 
   if (!file) return null
@@ -1355,13 +1357,7 @@ export const ShotstackEditor = forwardRef(function ShotstackEditor(
             <TransportBtn type="button" onClick={splitAtPlayhead} aria-label="Split">
               Split
             </TransportBtn>
-            <TransportBtn
-              type="button"
-              onClick={async () => {
-                const handle = ref && typeof ref !== 'function' ? ref.current : null
-                await handle?.saveTrimmedClip()
-              }}
-            >
+            <TransportBtn type="button" onClick={() => void saveTrimmedClip()}>
               Save clip
             </TransportBtn>
           </TransportActions>
