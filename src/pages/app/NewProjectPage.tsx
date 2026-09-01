@@ -713,6 +713,13 @@ export function NewProjectPage() {
                   file={file}
                   durationSeconds={duration}
                   onTimelineChange={handleTimelineChange}
+                  onCaptionsChange={({ enabled, position, fontFamily, fontSize, color }) => {
+                    patchOptions('captions', enabled)
+                    patchOptions('captionPosition', position)
+                    patchOptions('captionFontFamily', fontFamily)
+                    patchOptions('captionFontSize', fontSize)
+                    patchOptions('captionColor', color)
+                  }}
                 />
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid #e9e4f5' }}>
                   <Button
@@ -857,21 +864,78 @@ export function NewProjectPage() {
               </Field>
 
               {options.captions && (
-                <Field>
-                  Caption position
-                  <Select
-                    value={options.captionPosition}
-                    onChange={(e) =>
-                      patchOptions(
-                        'captionPosition',
-                        e.target.value as ProjectOptions['captionPosition'],
-                      )
-                    }
-                  >
-                    <option value="bottom">Bottom</option>
-                    <option value="top">Top</option>
-                  </Select>
-                </Field>
+                <>
+                  <Field>
+                    Caption position
+                    <Select
+                      value={options.captionPosition}
+                      onChange={(e) =>
+                        patchOptions(
+                          'captionPosition',
+                          e.target.value as ProjectOptions['captionPosition'],
+                        )
+                      }
+                    >
+                      <option value="bottom">Bottom</option>
+                      <option value="top">Top</option>
+                    </Select>
+                  </Field>
+                  <Field>
+                    Caption font
+                    <Select
+                      value={options.captionFontFamily}
+                      onChange={(e) =>
+                        patchOptions(
+                          'captionFontFamily',
+                          e.target.value as ProjectOptions['captionFontFamily'],
+                        )
+                      }
+                    >
+                      <option value="arial">Arial</option>
+                      <option value="impact">Impact</option>
+                      <option value="georgia">Georgia</option>
+                      <option value="verdana">Verdana</option>
+                      <option value="comic-sans">Comic Sans</option>
+                      <option value="courier">Courier</option>
+                      <option value="segoe">Segoe</option>
+                    </Select>
+                  </Field>
+                  <Field>
+                    Caption size
+                    <Select
+                      value={options.captionFontSize}
+                      onChange={(e) =>
+                        patchOptions(
+                          'captionFontSize',
+                          Number(e.target.value) as ProjectOptions['captionFontSize'],
+                        )
+                      }
+                    >
+                      <option value={18}>Small · 18</option>
+                      <option value={22}>Medium · 22</option>
+                      <option value={28}>Large · 28</option>
+                      <option value={36}>XL · 36</option>
+                      <option value={48}>Huge · 48</option>
+                    </Select>
+                  </Field>
+                  <Field>
+                    Caption color
+                    <Select
+                      value={options.captionColor}
+                      onChange={(e) =>
+                        patchOptions(
+                          'captionColor',
+                          e.target.value as ProjectOptions['captionColor'],
+                        )
+                      }
+                    >
+                      <option value="white">White</option>
+                      <option value="yellow">Yellow</option>
+                      <option value="black">Black</option>
+                      <option value="cyan">Cyan</option>
+                    </Select>
+                  </Field>
+                </>
               )}
             </FieldGrid>
 

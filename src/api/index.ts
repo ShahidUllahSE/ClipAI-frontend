@@ -14,5 +14,6 @@ export type { CreateProjectInput, ProjectStatus, User, VideoProject }
 
 export { authApi } from './authApi'
 export { adminApi } from './adminApi'
+export { captionsApi } from './captionsApi'
 export { projectsApi } from './projectsApi'
 export { API_BASE_URL, ApiError, apiDelay, apiFetch, getToken } from './client'

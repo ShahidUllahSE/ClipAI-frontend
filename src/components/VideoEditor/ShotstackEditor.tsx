@@ -1,5 +1,12 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle, useState } from 'react'
 import styled from 'styled-components'
+import { ApiError } from '@/api/client'
+import { captionsApi, type CaptionCue } from '@/api/captionsApi'
+import type {
+  CaptionColor,
+  CaptionFontFamily,
+  CaptionFontSize,
+} from '@/types/app'
 
 const Container = styled.div`
   display: flex;
@@ -74,24 +81,6 @@ const Video = styled.video<{
   will-change: transform, opacity, filter;
 `
 
-const CaptionOverlay = styled.div<{ $position: 'bottom' | 'top' }>`
-  position: absolute;
-  left: 50%;
-  ${({ $position }) => ($position === 'top' ? 'top: 1rem;' : 'bottom: 3.6rem;')}
-  transform: translateX(-50%);
-  max-width: 86%;
-  padding: 0.45rem 0.75rem;
-  border-radius: ${({ theme }) => theme.radii.sm};
-  background: rgba(18, 16, 31, 0.72);
-  color: ${({ theme }) => theme.colors.white};
-  font-size: 0.85rem;
-  font-weight: ${({ theme }) => theme.fontWeights.semibold};
-  text-align: center;
-  line-height: 1.3;
-  pointer-events: none;
-  z-index: 4;
-`
-
 const ToolPanel = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -124,7 +113,12 @@ const MiniControl = styled.button<{ $active?: boolean }>`
   font-weight: ${({ theme }) => theme.fontWeights.semibold};
   cursor: pointer;
 
-  &:hover {
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
     border-color: ${({ theme }) => theme.colors.primaryMuted};
     color: ${({ theme }) => theme.colors.primary};
   }
@@ -145,6 +139,48 @@ const CaptionInput = styled.input`
     outline: none;
     border-color: ${({ theme }) => theme.colors.primary};
   }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+`
+
+const CaptionSelect = styled.select`
+  appearance: none;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surface};
+  color: ${({ theme }) => theme.colors.ink};
+  border-radius: ${({ theme }) => theme.radii.full};
+  padding: 0.32rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: ${({ theme }) => theme.fontWeights.semibold};
+  cursor: pointer;
+  max-width: 9.5rem;
+
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
+`
+
+const CaptionSample = styled.span<{
+  $family: string
+  $size: number
+  $color: string
+}>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: ${({ theme }) => theme.radii.sm};
+  background: rgba(18, 16, 31, 0.82);
+  color: ${({ $color }) => $color};
+  font-family: ${({ $family }) => $family};
+  font-size: ${({ $size }) => `${Math.max(11, Math.min(18, $size * 0.42))}px`};
+  font-weight: 700;
+  line-height: 1.2;
 `
 
 const FlashOverlay = styled.div<{ $intensity: number }>`
@@ -557,6 +593,13 @@ interface Props {
   durationSeconds: number
   onTimelineChange?: (json: any) => void
   onCutSaved?: (file: File | null) => void
+  onCaptionsChange?: (next: {
+    enabled: boolean
+    position: 'bottom' | 'top'
+    fontFamily: CaptionFontFamily
+    fontSize: CaptionFontSize
+    color: CaptionColor
+  }) => void
 }
 
 export interface ShotstackEditorHandle {
@@ -589,6 +632,7 @@ type ToolId =
 
 type TransitionId =
   | 'none'
+  | 'punch'
   | 'zoom-in'
   | 'zoom-out'
   | 'fade'
@@ -616,6 +660,7 @@ const EFFECT_PRESETS: EffectPreset[] = [
 
 const TRANSITION_PRESETS: TransitionPreset[] = [
   { id: 'none', name: 'None', description: 'No motion', accent: 'linear-gradient(135deg, #e9e4f5, #f5f3ff)' },
+  { id: 'punch', name: 'Punch zoom', description: 'Jump-cut zoom in / out', accent: 'linear-gradient(135deg, #7c3aed, #f59e0b)' },
   { id: 'zoom-in', name: 'Zoom in', description: 'Cinematic push-in', accent: 'linear-gradient(135deg, #7c3aed, #1e1b4b)' },
   { id: 'zoom-out', name: 'Zoom out', description: 'Cinematic pull-back', accent: 'linear-gradient(135deg, #c4b5fd, #7c3aed)' },
   { id: 'ken-burns', name: 'Ken Burns', description: 'Slow pan + zoom', accent: 'linear-gradient(135deg, #f59e0b, #7c3aed)' },
@@ -661,6 +706,31 @@ const CROP_PRESETS: Array<{ id: CropId; label: string }> = [
   { id: 'bottom', label: 'Bottom' },
 ]
 
+const CAPTION_FONT_OPTIONS: Array<{ id: CaptionFontFamily; label: string; css: string }> = [
+  { id: 'arial', label: 'Arial', css: 'Arial, sans-serif' },
+  { id: 'impact', label: 'Impact', css: 'Impact, Haettenschweiler, sans-serif' },
+  { id: 'georgia', label: 'Georgia', css: 'Georgia, serif' },
+  { id: 'verdana', label: 'Verdana', css: 'Verdana, Geneva, sans-serif' },
+  { id: 'comic-sans', label: 'Comic Sans', css: '"Comic Sans MS", "Comic Sans", cursive' },
+  { id: 'courier', label: 'Courier', css: '"Courier New", Courier, monospace' },
+  { id: 'segoe', label: 'Segoe', css: '"Segoe UI", Tahoma, sans-serif' },
+]
+
+const CAPTION_SIZE_OPTIONS: Array<{ id: CaptionFontSize; label: string }> = [
+  { id: 18, label: 'S · 18' },
+  { id: 22, label: 'M · 22' },
+  { id: 28, label: 'L · 28' },
+  { id: 36, label: 'XL · 36' },
+  { id: 48, label: 'Huge · 48' },
+]
+
+const CAPTION_COLOR_OPTIONS: Array<{ id: CaptionColor; label: string; css: string }> = [
+  { id: 'white', label: 'White', css: '#ffffff' },
+  { id: 'yellow', label: 'Yellow', css: '#facc15' },
+  { id: 'black', label: 'Black', css: '#111827' },
+  { id: 'cyan', label: 'Cyan', css: '#22d3ee' },
+]
+
 const buildTimelineJson = (
   src: string,
   start: number,
@@ -674,6 +744,10 @@ const buildTimelineJson = (
     crop?: CropId
     captionsEnabled?: boolean
     captionText?: string
+    captionCues?: CaptionCue[]
+    captionFontFamily?: CaptionFontFamily
+    captionFontSize?: CaptionFontSize
+    captionColor?: CaptionColor
     zoom?: number
     transitionDuration?: number
     transitionSpeed?: TransitionSpeedId
@@ -715,7 +789,9 @@ const buildTimelineJson = (
         }
       : null,
     captions: extras.captionsEnabled
-      ? [{ text: extras.captionText || '', start, end }]
+      ? extras.captionCues?.length
+        ? extras.captionCues
+        : [{ text: extras.captionText || '', start, end }]
       : [],
   },
   output: {
@@ -741,6 +817,10 @@ const buildTimelineJson = (
     zoom: extras.zoom ?? 1,
     captionsEnabled: Boolean(extras.captionsEnabled),
     captionText: extras.captionText || '',
+    captionCues: extras.captionCues ?? [],
+    captionFontFamily: extras.captionFontFamily ?? 'arial',
+    captionFontSize: extras.captionFontSize ?? 22,
+    captionColor: extras.captionColor ?? 'white',
   },
 })
 
@@ -765,11 +845,12 @@ const seekVideoTo = (video: HTMLVideoElement, time: number) => new Promise<void>
 })
 
 export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function ShotstackEditor(
-  { file, durationSeconds, onTimelineChange, onCutSaved }: Props,
+  { file, durationSeconds, onTimelineChange, onCutSaved, onCaptionsChange }: Props,
   ref,
 ) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const fileUrlRef = useRef<string | null>(null)
+  const captionRequestRef = useRef(0)
   const [sourceUrl, setSourceUrl] = useState<string | null>(null)
   const [trimStart, setTrimStart] = useState(0)
   const [trimEnd, setTrimEnd] = useState(10)
@@ -779,15 +860,20 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
   const [keyframes, setKeyframes] = useState<number[]>([])
   const [segments, setSegments] = useState<Array<{ start: number; end: number }>>([])
   const [videoZoom, setVideoZoom] = useState(1)
-  const [videoTransition, setVideoTransition] = useState<TransitionId>('none')
+  const [videoTransition, setVideoTransition] = useState<TransitionId>('punch')
   const [transitionSpeedId, setTransitionSpeedId] = useState<TransitionSpeedId>('smooth')
   const [selectedEffect, setSelectedEffect] = useState<EffectPreset>(EFFECT_PRESETS[0])
   const [activeTool, setActiveTool] = useState<ToolId>('trim')
   const [playbackSpeed, setPlaybackSpeed] = useState(1)
   const [cropPreset, setCropPreset] = useState<CropId>('none')
-  const [captionsEnabled, setCaptionsEnabled] = useState(false)
+  const [captionsEnabled, setCaptionsEnabled] = useState(true)
   const [captionText, setCaptionText] = useState('')
+  const [captionCues, setCaptionCues] = useState<CaptionCue[]>([])
+  const [captionLoading, setCaptionLoading] = useState(false)
   const [captionPosition, setCaptionPosition] = useState<'bottom' | 'top'>('bottom')
+  const [captionFontFamily, setCaptionFontFamily] = useState<CaptionFontFamily>('arial')
+  const [captionFontSize, setCaptionFontSize] = useState<CaptionFontSize>(22)
+  const [captionColor, setCaptionColor] = useState<CaptionColor>('white')
   const [toolMessage, setToolMessage] = useState('Drag the purple handles to set in/out points.')
   const transitionsRef = useRef<HTMLDivElement | null>(null)
 
@@ -799,6 +885,10 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
     crop: cropPreset,
     captionsEnabled,
     captionText,
+    captionCues,
+    captionFontFamily,
+    captionFontSize,
+    captionColor,
     zoom: videoZoom,
     transitionDuration,
     transitionSpeed: transitionSpeedId,
@@ -888,7 +978,12 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
     setKeyframes(autoKeyframes)
     setSegments(defaultSegments)
     setVideoZoom(1)
-    setVideoTransition('none')
+    setVideoTransition('punch')
+    setCaptionsEnabled(false)
+    setCaptionText('')
+    setCaptionCues([])
+    setCaptionLoading(false)
+    captionRequestRef.current += 1
 
     const json = buildTimelineJson(nextUrl, 0, total, autoKeyframes, defaultSegments, selectedEffect, videoTransition, editorExtras)
     notifyTimelineChange(json)
@@ -905,7 +1000,7 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
     if (!sourceUrl) return
     const current = buildTimelineJson(sourceUrl, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition, editorExtras)
     notifyTimelineChange(current)
-  }, [sourceUrl, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition, playbackSpeed, cropPreset, captionsEnabled, captionText, videoZoom, transitionSpeedId, transitionDuration])
+  }, [sourceUrl, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition, playbackSpeed, cropPreset, captionsEnabled, captionText, captionCues, captionFontFamily, captionFontSize, captionColor, videoZoom, transitionSpeedId, transitionDuration])
 
   useEffect(() => {
     if (videoRef.current) {
@@ -1103,16 +1198,75 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
     setSpeed(next)
   }
 
-  const toggleCaptions = () => {
-    setCaptionsEnabled((value) => {
-      const next = !value
-      setToolMessage(next ? 'Captions on — edit the text below.' : 'Captions off')
-      if (next && !captionText.trim()) {
-        setCaptionText('Your caption here')
-      }
-      return next
+  const emitCaptionsChange = (patch: {
+    enabled?: boolean
+    position?: 'bottom' | 'top'
+    fontFamily?: CaptionFontFamily
+    fontSize?: CaptionFontSize
+    color?: CaptionColor
+  }) => {
+    onCaptionsChange?.({
+      enabled: patch.enabled ?? captionsEnabled,
+      position: patch.position ?? captionPosition,
+      fontFamily: patch.fontFamily ?? captionFontFamily,
+      fontSize: patch.fontSize ?? captionFontSize,
+      color: patch.color ?? captionColor,
     })
+  }
+
+  const generateCaptionsFromVideo = async () => {
+    if (!file || captionLoading) return
+
+    const requestId = captionRequestRef.current + 1
+    captionRequestRef.current = requestId
+    setCaptionsEnabled(true)
     setActiveTool('caption')
+    emitCaptionsChange({ enabled: true })
+    setCaptionLoading(true)
+    setToolMessage('Extracting audio and generating captions with Gemini…')
+
+    try {
+      const result = await captionsApi.transcribe(file)
+      if (requestId !== captionRequestRef.current) return
+      setCaptionText(result.transcript)
+      setCaptionCues(result.cues)
+      if (result.cues.length) {
+        setToolMessage(
+          `Transcript ready (${result.cues.length} line${result.cues.length === 1 ? '' : 's'}). Captions will be burned in after you submit.`,
+        )
+      } else if (result.transcript.trim()) {
+        setToolMessage('Transcript ready. Captions will be burned in after you submit.')
+      } else {
+        setToolMessage('No speech found in this clip. You can type a caption instead.')
+      }
+    } catch (error) {
+      if (requestId !== captionRequestRef.current) return
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Could not generate captions from this video.'
+      setToolMessage(message)
+    } finally {
+      if (requestId === captionRequestRef.current) {
+        setCaptionLoading(false)
+      }
+    }
+  }
+
+  const toggleCaptions = () => {
+    setActiveTool('caption')
+    if (captionsEnabled) {
+      setCaptionsEnabled(false)
+      emitCaptionsChange({ enabled: false })
+      setToolMessage('Captions off — they will not be added after submit.')
+      return
+    }
+
+    setCaptionsEnabled(true)
+    emitCaptionsChange({ enabled: true })
+    setToolMessage('Captions on — preview stays clean; they are burned into the export after submit.')
   }
 
   const focusTransitions = () => {
@@ -1211,6 +1365,11 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
     rawTransitionProgress = clamp((playhead - windowStart) / localDuration, 0, 1)
   } else if (videoTransition === 'ken-burns') {
     rawTransitionProgress = clamp((playhead - trimStart) / clipSpan, 0, 1)
+  } else if (videoTransition === 'punch') {
+    const active = segments.find((segment) => playhead >= segment.start && playhead <= segment.end)
+    const span = Math.max(0.2, (active?.end ?? trimEnd) - (active?.start ?? trimStart))
+    const start = active?.start ?? trimStart
+    rawTransitionProgress = clamp((playhead - start) / span, 0, 1)
   } else {
     // zoom-in, fade, slides, blur, flash — play over the opening window
     rawTransitionProgress = clamp((playhead - trimStart) / localDuration, 0, 1)
@@ -1227,6 +1386,18 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
   let flashIntensity = 0
 
   switch (videoTransition) {
+    case 'punch': {
+      const activeIndex = Math.max(
+        0,
+        segments.findIndex((segment) => playhead >= segment.start && playhead <= segment.end),
+      )
+      const zoomAmount = 0.22
+      effectiveZoom =
+        activeIndex % 2 === 0
+          ? clamp(1 + eased * zoomAmount, 1, 1.22)
+          : clamp(1 + zoomAmount - eased * zoomAmount, 1, 1.22)
+      break
+    }
     case 'zoom-in': {
       // Cinematic push-in: gentle start, confident finish
       const zoomAmount = 0.55
@@ -1283,6 +1454,11 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
     .map((time) => (time / totalDuration) * 100)
 
   const activeTransition = TRANSITION_PRESETS.find((item) => item.id === videoTransition) ?? TRANSITION_PRESETS[0]
+  const activeCueIndex = captionCues.findIndex((cue, index) => {
+    const last = index === captionCues.length - 1
+    return playhead >= cue.start && (last ? playhead <= cue.end : playhead < cue.end)
+  })
+  const captionInputValue = activeCueIndex >= 0 ? captionCues[activeCueIndex].text : captionText
 
   return (
     <Container>
@@ -1311,9 +1487,6 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
             }}
           />
           <FlashOverlay $intensity={flashIntensity} />
-          {captionsEnabled && captionText.trim() && (
-            <CaptionOverlay $position={captionPosition}>{captionText}</CaptionOverlay>
-          )}
         </VideoStage>
 
         <TransportBar>
@@ -1391,7 +1564,14 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
           <ToolBtn type="button" $active={activeTool === 'speed'} onClick={cycleSpeed}>
             Speed
           </ToolBtn>
-          <ToolBtn type="button" $active={activeTool === 'caption'} onClick={toggleCaptions}>
+          <ToolBtn
+            type="button"
+            $active={activeTool === 'caption'}
+            onClick={() => {
+              setActiveTool('caption')
+              if (!captionsEnabled) toggleCaptions()
+            }}
+          >
             Captions
           </ToolBtn>
           <ToolBtn type="button" $active={activeTool === 'effect'} onClick={addKeyframeAtPlayhead}>
@@ -1465,21 +1645,101 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
             <MiniControl
               type="button"
               $active={captionPosition === 'bottom'}
-              onClick={() => setCaptionPosition('bottom')}
+              onClick={() => {
+                setCaptionPosition('bottom')
+                emitCaptionsChange({ position: 'bottom' })
+              }}
             >
               Bottom
             </MiniControl>
             <MiniControl
               type="button"
               $active={captionPosition === 'top'}
-              onClick={() => setCaptionPosition('top')}
+              onClick={() => {
+                setCaptionPosition('top')
+                emitCaptionsChange({ position: 'top' })
+              }}
             >
               Top
             </MiniControl>
+            <CaptionSelect
+              aria-label="Caption font"
+              value={captionFontFamily}
+              onChange={(event) => {
+                const next = event.target.value as CaptionFontFamily
+                setCaptionFontFamily(next)
+                emitCaptionsChange({ fontFamily: next })
+                setToolMessage(`Caption font: ${CAPTION_FONT_OPTIONS.find((item) => item.id === next)?.label ?? next}`)
+              }}
+            >
+              {CAPTION_FONT_OPTIONS.map((font) => (
+                <option key={font.id} value={font.id}>
+                  {font.label}
+                </option>
+              ))}
+            </CaptionSelect>
+            <CaptionSelect
+              aria-label="Caption size"
+              value={captionFontSize}
+              onChange={(event) => {
+                const next = Number(event.target.value) as CaptionFontSize
+                setCaptionFontSize(next)
+                emitCaptionsChange({ fontSize: next })
+                setToolMessage(`Caption size: ${next}px`)
+              }}
+            >
+              {CAPTION_SIZE_OPTIONS.map((size) => (
+                <option key={size.id} value={size.id}>
+                  {size.label}
+                </option>
+              ))}
+            </CaptionSelect>
+            <CaptionSelect
+              aria-label="Caption color"
+              value={captionColor}
+              onChange={(event) => {
+                const next = event.target.value as CaptionColor
+                setCaptionColor(next)
+                emitCaptionsChange({ color: next })
+                setToolMessage(`Caption color: ${next}`)
+              }}
+            >
+              {CAPTION_COLOR_OPTIONS.map((color) => (
+                <option key={color.id} value={color.id}>
+                  {color.label}
+                </option>
+              ))}
+            </CaptionSelect>
+            <CaptionSample
+              $family={CAPTION_FONT_OPTIONS.find((item) => item.id === captionFontFamily)?.css ?? 'Arial, sans-serif'}
+              $size={captionFontSize}
+              $color={CAPTION_COLOR_OPTIONS.find((item) => item.id === captionColor)?.css ?? '#ffffff'}
+            >
+              Aa
+            </CaptionSample>
+            <MiniControl
+              type="button"
+              disabled={captionLoading || !file}
+              onClick={() => void generateCaptionsFromVideo()}
+            >
+              {captionLoading ? 'Generating…' : 'Generate from video'}
+            </MiniControl>
             <CaptionInput
-              value={captionText}
-              onChange={(event) => setCaptionText(event.target.value)}
-              placeholder="Caption text"
+              value={captionInputValue}
+              disabled={captionLoading}
+              onChange={(event) => {
+                const next = event.target.value
+                if (activeCueIndex >= 0) {
+                  setCaptionCues((cues) =>
+                    cues.map((cue, index) =>
+                      index === activeCueIndex ? { ...cue, text: next } : cue,
+                    ),
+                  )
+                  return
+                }
+                setCaptionText(next)
+              }}
+              placeholder={captionLoading ? 'Transcribing video audio…' : 'Caption text'}
             />
           </>
         )}

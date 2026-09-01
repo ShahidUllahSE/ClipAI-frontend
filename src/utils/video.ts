@@ -112,7 +112,7 @@ export function optionsSummary(options: Partial<ProjectOptions> = {}): string[] 
   const lines: string[] = [
     `Aspect ${options.aspectRatio ?? '9:16'}`,
     options.captions
-      ? `Captions (${options.captionPosition ?? 'bottom'})`
+      ? `Captions (${options.captionPosition ?? 'bottom'}, ${options.captionFontFamily ?? 'arial'} ${options.captionFontSize ?? 22})`
       : 'Captions off',
     `Speed ramp: ${options.speedRamp ?? 'off'}`,
     options.keyframing

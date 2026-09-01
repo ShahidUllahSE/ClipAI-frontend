@@ -21,6 +21,16 @@ export type SilenceSensitivity = 'light' | 'medium' | 'aggressive'
 export type PacingLevel = 'normal' | 'fast' | 'very-fast'
 export type SpeedRampLevel = 'off' | 'light' | 'medium' | 'aggressive'
 export type CaptionPosition = 'bottom' | 'top'
+export type CaptionFontFamily =
+  | 'arial'
+  | 'impact'
+  | 'georgia'
+  | 'verdana'
+  | 'comic-sans'
+  | 'courier'
+  | 'segoe'
+export type CaptionFontSize = 18 | 22 | 28 | 36 | 48
+export type CaptionColor = 'white' | 'yellow' | 'black' | 'cyan'
 export type KeyframePreset =
   | 'slow-zoom-in'
   | 'slow-zoom-out'
@@ -32,6 +42,9 @@ export type ColorGrade = 'none' | 'clean' | 'warm' | 'cool' | 'vivid'
 export interface ProjectOptions {
   captions: boolean
   captionPosition: CaptionPosition
+  captionFontFamily: CaptionFontFamily
+  captionFontSize: CaptionFontSize
+  captionColor: CaptionColor
   aspectRatio: AspectRatio
   silenceSensitivity: SilenceSensitivity
   pacing: PacingLevel
@@ -106,6 +119,9 @@ export interface CreateProjectInput {
 export const DEFAULT_PROJECT_OPTIONS: ProjectOptions = {
   captions: true,
   captionPosition: 'bottom',
+  captionFontFamily: 'arial',
+  captionFontSize: 22,
+  captionColor: 'white',
   aspectRatio: '9:16',
   silenceSensitivity: 'medium',
   pacing: 'fast',
