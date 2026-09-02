@@ -12,6 +12,7 @@ import { useAuth } from '@/context/AuthContext'
 import type {
   CreateProjectInput,
   ProjectStatus,
+  UploadProgress,
   VideoProject,
 } from '@/types/app'
 
@@ -19,7 +20,10 @@ interface ProjectsContextValue {
   projects: VideoProject[]
   loading: boolean
   refresh: () => Promise<void>
-  create: (input: CreateProjectInput) => Promise<VideoProject>
+  create: (
+    input: CreateProjectInput,
+    onUploadProgress?: (progress: UploadProgress) => void,
+  ) => Promise<VideoProject>
   get: (id: string) => VideoProject | undefined
   updateTitle: (id: string, generatedTitle: string) => Promise<void>
   remove: (id: string) => Promise<void>
@@ -63,9 +67,12 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const create = useCallback(
-    async (input: CreateProjectInput) => {
+    async (
+      input: CreateProjectInput,
+      onUploadProgress?: (progress: UploadProgress) => void,
+    ) => {
       if (!user) throw new Error('Not signed in.')
-      const project = await projectsApi.create(user.id, input)
+      const project = await projectsApi.create(user.id, input, onUploadProgress)
       setProjects((prev) => [project, ...prev])
       return project
     },

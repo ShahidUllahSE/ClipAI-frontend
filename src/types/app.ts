@@ -116,6 +116,14 @@ export interface CreateProjectInput {
   title?: string
 }
 
+export interface UploadProgress {
+  uploadedBytes: number
+  totalBytes: number
+  percent: number
+  bytesPerSecond: number
+  remainingSeconds: number | null
+}
+
 export const DEFAULT_PROJECT_OPTIONS: ProjectOptions = {
   captions: true,
   captionPosition: 'bottom',

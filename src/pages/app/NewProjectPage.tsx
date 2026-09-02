@@ -8,6 +8,7 @@ import {
   DEFAULT_PROJECT_OPTIONS,
   type EditingModeId,
   type ProjectOptions,
+  type UploadProgress,
 } from '@/types/app'
 import {
   formatBytes,
@@ -369,6 +370,21 @@ const ProgressBar = styled.div<{ $value: number }>`
   transition: width 0.2s ease;
 `
 
+const UploadStats = styled.p`
+  margin: 0.35rem 0 0;
+  color: ${({ theme }) => theme.colors.textMuted};
+  font-size: 0.7rem;
+  line-height: 1.35;
+`
+
+function formatRemaining(seconds: number | null) {
+  if (seconds == null || !Number.isFinite(seconds)) return 'calculating…'
+  if (seconds < 60) return `${Math.max(1, Math.ceil(seconds))}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainder = Math.ceil(seconds % 60)
+  return `${minutes}m ${remainder}s`
+}
+
 const MODES: { id: EditingModeId; name: string; text: string; live: boolean }[] =
   [
     {
@@ -412,6 +428,7 @@ export function NewProjectPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStats, setUploadStats] = useState<UploadProgress | null>(null)
   const editorRef = useRef<any>(null)
 
   const patchOptions = useCallback(
@@ -442,6 +459,8 @@ export function NewProjectPage() {
   const onFile = useCallback(
     async (next: File | null) => {
       setError('')
+      setUploadProgress(0)
+      setUploadStats(null)
       setFile(null)
       setDuration(0)
       if (!next) return
@@ -461,6 +480,8 @@ export function NewProjectPage() {
 
   const onFileB = useCallback(async (next: File | null) => {
     setError('')
+    setUploadProgress(0)
+    setUploadStats(null)
     setFileB(null)
     setDurationB(0)
     if (!next) return
@@ -506,24 +527,27 @@ export function NewProjectPage() {
     }
     setBusy(true)
     setError('')
-    setUploadProgress(15)
+    setUploadProgress(0)
+    setUploadStats(null)
     try {
-      for (const value of [35, 55, 75, 90]) {
-        await new Promise((r) => setTimeout(r, 120))
-        setUploadProgress(value)
-      }
       const timelineJson =
         (await editorRef.current?.getTimelineJson()) ?? options.timelineJson
-      const project = await create({
-        file,
-        secondaryFile: mode === 'ai-combine' ? fileB ?? undefined : undefined,
-        durationSeconds: duration,
-        secondaryDurationSeconds:
-          mode === 'ai-combine' ? durationB : undefined,
-        mode,
-        options: { ...options, timelineJson },
-        title: title.trim() || undefined,
-      })
+      const project = await create(
+        {
+          file,
+          secondaryFile: mode === 'ai-combine' ? fileB ?? undefined : undefined,
+          durationSeconds: duration,
+          secondaryDurationSeconds:
+            mode === 'ai-combine' ? durationB : undefined,
+          mode,
+          options: { ...options, timelineJson },
+          title: title.trim() || undefined,
+        },
+        (progress) => {
+          setUploadStats(progress)
+          setUploadProgress(progress.percent)
+        },
+      )
       setUploadProgress(100)
       void process(project.id)
       navigate(ROUTES.project(project.id))
@@ -642,9 +666,22 @@ export function NewProjectPage() {
                 onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
               />
               {busy && (
-                <Progress style={{ marginTop: '0.65rem' }}>
-                  <ProgressBar $value={uploadProgress} />
-                </Progress>
+                <>
+                  <Progress style={{ marginTop: '0.65rem' }}>
+                    <ProgressBar $value={uploadProgress} />
+                  </Progress>
+                  {uploadStats && (
+                    <UploadStats>
+                      {formatBytes(uploadStats.uploadedBytes)} /{' '}
+                      {formatBytes(uploadStats.totalBytes)} ·{' '}
+                      {uploadStats.percent.toFixed(1)}% ·{' '}
+                      {uploadStats.bytesPerSecond > 0
+                        ? `${formatBytes(uploadStats.bytesPerSecond)}/s`
+                        : 'measuring speed…'}{' '}
+                      · {formatRemaining(uploadStats.remainingSeconds)} remaining
+                    </UploadStats>
+                  )}
+                </>
               )}
               {error && (
                 <ErrorText style={{ marginTop: '0.65rem', marginBottom: 0 }}>
