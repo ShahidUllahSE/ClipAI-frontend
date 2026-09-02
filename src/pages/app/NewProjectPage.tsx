@@ -512,6 +512,8 @@ export function NewProjectPage() {
         await new Promise((r) => setTimeout(r, 120))
         setUploadProgress(value)
       }
+      const timelineJson =
+        (await editorRef.current?.getTimelineJson()) ?? options.timelineJson
       const project = await create({
         file,
         secondaryFile: mode === 'ai-combine' ? fileB ?? undefined : undefined,
@@ -519,7 +521,7 @@ export function NewProjectPage() {
         secondaryDurationSeconds:
           mode === 'ai-combine' ? durationB : undefined,
         mode,
-        options,
+        options: { ...options, timelineJson },
         title: title.trim() || undefined,
       })
       setUploadProgress(100)
