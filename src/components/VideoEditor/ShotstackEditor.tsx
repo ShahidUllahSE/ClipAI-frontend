@@ -1569,7 +1569,6 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
             $active={activeTool === 'caption'}
             onClick={() => {
               setActiveTool('caption')
-              if (!captionsEnabled) toggleCaptions()
             }}
           >
             Captions
@@ -1639,14 +1638,35 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
 
         {activeTool === 'caption' && (
           <>
-            <MiniControl type="button" $active={captionsEnabled} onClick={toggleCaptions}>
-              {captionsEnabled ? 'On' : 'Off'}
+            <MiniControl
+              type="button"
+              $active={!captionsEnabled}
+              onClick={() => {
+                if (captionsEnabled) toggleCaptions()
+              }}
+            >
+              Off
             </MiniControl>
             <MiniControl
               type="button"
-              $active={captionPosition === 'bottom'}
+              $active={captionsEnabled}
+              onClick={() => {
+                if (!captionsEnabled) toggleCaptions()
+              }}
+            >
+              On
+            </MiniControl>
+            <MiniControl
+              type="button"
+              $active={captionsEnabled && captionPosition === 'bottom'}
               onClick={() => {
                 setCaptionPosition('bottom')
+                if (!captionsEnabled) {
+                  setCaptionsEnabled(true)
+                  emitCaptionsChange({ enabled: true, position: 'bottom' })
+                  setToolMessage('Captions on — preview stays clean; they are burned into the export after submit.')
+                  return
+                }
                 emitCaptionsChange({ position: 'bottom' })
               }}
             >
@@ -1654,9 +1674,15 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
             </MiniControl>
             <MiniControl
               type="button"
-              $active={captionPosition === 'top'}
+              $active={captionsEnabled && captionPosition === 'top'}
               onClick={() => {
                 setCaptionPosition('top')
+                if (!captionsEnabled) {
+                  setCaptionsEnabled(true)
+                  emitCaptionsChange({ enabled: true, position: 'top' })
+                  setToolMessage('Captions on — preview stays clean; they are burned into the export after submit.')
+                  return
+                }
                 emitCaptionsChange({ position: 'top' })
               }}
             >
