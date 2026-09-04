@@ -146,9 +146,9 @@ export const DEFAULT_PROJECT_OPTIONS: ProjectOptions = {
 }
 
 export const PLAN_EDIT_QUOTA: Record<PlanId, number> = {
-  basic: 50,
-  standard: 100,
-  pro: 200,
+  basic: 80,
+  standard: 200,
+  pro: 400,
   unlimited: 9999,
 }
 

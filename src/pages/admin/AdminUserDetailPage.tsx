@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { adminApi } from '@/api/adminApi'
-import { Button, ErrorText, Field, HelpText, Input } from '@/components/ui'
+import { Button, ErrorText, Field, HelpText, Input, Skeleton } from '@/components/ui'
 import { PLANS, ROUTES } from '@/constants'
 import { useAuth } from '@/context/AuthContext'
 import type { BillingStatus, PlanId, User, UserRole } from '@/types/app'
@@ -231,7 +231,25 @@ export function AdminUserDetailPage() {
     )
   }
 
-  if (!user) return <Lead>Loading user…</Lead>
+  if (!user) {
+    return (
+      <Page>
+        <Header>
+          <div>
+            <Eyebrow>User account</Eyebrow>
+            <Skeleton $w="10rem" $h="1.4rem" />
+            <Skeleton $w="14rem" $h="0.75rem" $mt="0.45rem" />
+          </div>
+        </Header>
+        <StatusRow>
+          <Skeleton $w="4rem" $h="1.4rem" $r="999px" />
+          <Skeleton $w="4.2rem" $h="1.4rem" $r="999px" />
+          <Skeleton $w="4.8rem" $h="1.4rem" $r="999px" />
+        </StatusRow>
+        <Skeleton $h="16rem" $r="1rem" />
+      </Page>
+    )
+  }
 
   return (
     <Page>

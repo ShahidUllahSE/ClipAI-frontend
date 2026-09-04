@@ -37,12 +37,13 @@ const ProjectsContext = createContext<ProjectsContextValue | null>(null)
 export function ProjectsProvider({ children }: { children: ReactNode }) {
   const { user, refreshUser } = useAuth()
   const [projects, setProjects] = useState<VideoProject[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
 
   const refresh = useCallback(async () => {
     if (!user) {
       setProjects([])
+      setLoading(false)
       return
     }
     setLoading(true)

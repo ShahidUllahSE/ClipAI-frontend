@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { adminApi, type AdminStats } from '@/api/adminApi'
-import { Button, ErrorText } from '@/components/ui'
-import { ROUTES } from '@/constants'
+import { Button, ErrorText, Skeleton } from '@/components/ui'
+import { PLANS, ROUTES } from '@/constants'
 
 const fade = keyframes`
   from { opacity: 0; transform: translateY(0.3rem); }
@@ -104,6 +104,63 @@ const StatValue = styled.p`
   font-weight: 800;
   letter-spacing: -0.04em;
   color: ${({ theme }) => theme.colors.ink};
+`
+
+const StatHint = styled.p`
+  position: relative;
+  z-index: 1;
+  margin: 0.3rem 0 0;
+  font-size: 0.72rem;
+  color: ${({ theme }) => theme.colors.textMuted};
+`
+
+const Split = styled.div`
+  display: grid;
+  gap: 0.85rem;
+
+  @media (min-width: ${({ theme }) => theme.breakpoints.lg}) {
+    grid-template-columns: 1.35fr 0.65fr;
+    align-items: start;
+  }
+`
+
+const PlanList = styled.ul`
+  list-style: none;
+  margin: 0;
+  padding: 0.45rem;
+  display: grid;
+  gap: 0.4rem;
+`
+
+const PlanRow = styled.li`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.7rem;
+  background: ${({ theme }) => theme.colors.elevated};
+`
+
+const PlanName = styled.span`
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: ${({ theme }) => theme.colors.ink};
+  text-transform: capitalize;
+`
+
+const PlanCount = styled.span`
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: ${({ theme }) => theme.colors.primary};
+`
+
+const EmptyNote = styled.p`
+  margin: 0;
+  padding: 1.1rem 0.9rem;
+  font-size: 0.84rem;
+  color: ${({ theme }) => theme.colors.textMuted};
 `
 
 const Panel = styled.section`
@@ -222,9 +279,19 @@ export function AdminDashboardPage() {
     }
   }, [])
 
-  if (loading) return <Lead>Loading admin overview…</Lead>
-  if (error) return <ErrorText>{error}</ErrorText>
-  if (!stats) return null
+  if (error) {
+    return (
+      <Page>
+        <Header>
+          <div>
+            <Eyebrow>Overview</Eyebrow>
+            <Title>Admin dashboard</Title>
+          </div>
+        </Header>
+        <ErrorText>{error}</ErrorText>
+      </Page>
+    )
+  }
 
   return (
     <Page>
@@ -239,47 +306,125 @@ export function AdminDashboardPage() {
         </Button>
       </Header>
 
-      <Grid>
-        <StatCard $accent>
-          <StatLabel>Total users</StatLabel>
-          <StatValue>{stats.totals.users}</StatValue>
-        </StatCard>
-        <StatCard>
-          <StatLabel>Active</StatLabel>
-          <StatValue>{stats.totals.activeUsers}</StatValue>
-        </StatCard>
-        <StatCard>
-          <StatLabel>Admins</StatLabel>
-          <StatValue>{stats.totals.admins}</StatValue>
-        </StatCard>
-        <StatCard>
-          <StatLabel>Verified email</StatLabel>
-          <StatValue>{stats.totals.verifiedUsers}</StatValue>
-        </StatCard>
-      </Grid>
+      {loading || !stats ? (
+        <>
+          <Grid aria-busy="true" aria-label="Loading stats">
+            {Array.from({ length: 4 }, (_, i) => (
+              <StatCard key={i}>
+                <Skeleton $w="4.5rem" $h="0.6rem" />
+                <Skeleton $w="3rem" $h="1.6rem" $mt="0.55rem" />
+              </StatCard>
+            ))}
+          </Grid>
+          <Split>
+            <Panel>
+              <PanelHead>
+                <PanelTitle>Recent users</PanelTitle>
+              </PanelHead>
+              <List>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <Row key={i}>
+                    <UserMeta>
+                      <Skeleton $w="8rem" $h="0.8rem" />
+                      <Skeleton $w="12rem" $h="0.65rem" $mt="0.35rem" />
+                    </UserMeta>
+                    <Skeleton $w="3.2rem" $h="1.6rem" $r="0.55rem" />
+                  </Row>
+                ))}
+              </List>
+            </Panel>
+            <Panel>
+              <PanelHead>
+                <PanelTitle>By plan</PanelTitle>
+              </PanelHead>
+              <PlanList>
+                {Array.from({ length: 4 }, (_, i) => (
+                  <PlanRow key={i}>
+                    <Skeleton $w="5rem" $h="0.75rem" />
+                    <Skeleton $w="1.6rem" $h="0.85rem" />
+                  </PlanRow>
+                ))}
+              </PlanList>
+            </Panel>
+          </Split>
+        </>
+      ) : (
+        <>
+          <Grid>
+            <StatCard $accent>
+              <StatLabel>Total users</StatLabel>
+              <StatValue>{stats.totals.users}</StatValue>
+              <StatHint>All registered accounts</StatHint>
+            </StatCard>
+            <StatCard>
+              <StatLabel>Active</StatLabel>
+              <StatValue>{stats.totals.activeUsers}</StatValue>
+              <StatHint>
+                {stats.totals.disabledUsers} disabled
+              </StatHint>
+            </StatCard>
+            <StatCard>
+              <StatLabel>Admins</StatLabel>
+              <StatValue>{stats.totals.admins}</StatValue>
+              <StatHint>Console access</StatHint>
+            </StatCard>
+            <StatCard>
+              <StatLabel>Verified email</StatLabel>
+              <StatValue>{stats.totals.verifiedUsers}</StatValue>
+              <StatHint>Confirmed inboxes</StatHint>
+            </StatCard>
+          </Grid>
 
-      <Panel>
-        <PanelHead>
-          <PanelTitle>Recent users</PanelTitle>
-          <ViewLink to={ROUTES.adminUsers}>View all</ViewLink>
-        </PanelHead>
-        <List>
-          {stats.recentUsers.map((user) => (
-            <Row key={user.id}>
-              <UserMeta>
-                <UserName>{user.name}</UserName>
-                <UserEmail>{user.email}</UserEmail>
-              </UserMeta>
-              <ViewLink to={ROUTES.adminUser(user.id)}>View</ViewLink>
-            </Row>
-          ))}
-        </List>
-        <Foot>
-          <Button as={Link} to={ROUTES.adminUsers} $variant="secondary">
-            Manage all users
-          </Button>
-        </Foot>
-      </Panel>
+          <Split>
+            <Panel>
+              <PanelHead>
+                <PanelTitle>Recent users</PanelTitle>
+                <ViewLink to={ROUTES.adminUsers}>View all</ViewLink>
+              </PanelHead>
+              {stats.recentUsers.length === 0 ? (
+                <EmptyNote>No signups yet.</EmptyNote>
+              ) : (
+                <List>
+                  {stats.recentUsers.map((user) => (
+                    <Row key={user.id}>
+                      <UserMeta>
+                        <UserName>{user.name}</UserName>
+                        <UserEmail>{user.email}</UserEmail>
+                      </UserMeta>
+                      <ViewLink to={ROUTES.adminUser(user.id)}>View</ViewLink>
+                    </Row>
+                  ))}
+                </List>
+              )}
+              <Foot>
+                <Button as={Link} to={ROUTES.adminUsers} $variant="secondary">
+                  Manage all users
+                </Button>
+              </Foot>
+            </Panel>
+
+            <Panel>
+              <PanelHead>
+                <PanelTitle>By plan</PanelTitle>
+              </PanelHead>
+              {Object.entries(stats.byPlan).length === 0 ? (
+                <EmptyNote>No plan data yet.</EmptyNote>
+              ) : (
+                <PlanList>
+                  {Object.entries(stats.byPlan).map(([planId, count]) => (
+                    <PlanRow key={planId}>
+                      <PlanName>
+                        {PLANS.find((p) => p.id === planId)?.name ?? planId}
+                      </PlanName>
+                      <PlanCount>{count}</PlanCount>
+                    </PlanRow>
+                  ))}
+                </PlanList>
+              )}
+            </Panel>
+          </Split>
+        </>
+      )}
     </Page>
   )
 }

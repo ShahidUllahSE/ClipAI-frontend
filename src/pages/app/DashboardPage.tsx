@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import styled, { keyframes } from 'styled-components'
-import { Button } from '@/components/ui'
+import { Button, Skeleton } from '@/components/ui'
 import { useAuth } from '@/context/AuthContext'
 import { useProjects } from '@/context/ProjectsContext'
 import { APP_NAME, PLANS, ROUTES } from '@/constants'
 import { PLAN_EDIT_QUOTA } from '@/types/app'
+import type { VideoProject } from '@/types/app'
 import {
   formatDuration,
   modeLabel,
@@ -269,7 +271,7 @@ const ProjectCard = styled(Link)`
     border-color ${({ theme }) => theme.transitions.fast};
 
   &:hover {
-    transform: translateY(-4px);
+    transform: translateY(-3px);
     box-shadow: ${({ theme }) => theme.shadows.md};
     border-color: ${({ theme }) => theme.colors.primaryMuted};
   }
@@ -455,11 +457,88 @@ const EmptyText = styled.p`
   line-height: 1.55;
 `
 
-const Loading = styled.div`
-  padding: ${({ theme }) => theme.space['2xl']};
-  text-align: center;
-  color: ${({ theme }) => theme.colors.textMuted};
+const ThumbShimmer = styled(Skeleton)`
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 0;
+  height: 100%;
 `
+
+const CardSkeleton = styled.div`
+  overflow: hidden;
+  border-radius: ${({ theme }) => theme.radii.xl};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.surface};
+`
+
+const PROCESSING_STATUSES = [
+  'Queued',
+  'Analyzing',
+  'Preparing edit',
+  'Rendering',
+  'Uploading',
+] as const
+
+function isProcessing(status: string) {
+  return (PROCESSING_STATUSES as readonly string[]).includes(status)
+}
+
+function ProjectThumb({ project }: { project: VideoProject }) {
+  const [ready, setReady] = useState(!project.previewUrl)
+
+  return (
+    <Thumb $mode={project.mode}>
+      {project.previewUrl ? (
+        <video
+          src={project.previewUrl}
+          muted
+          playsInline
+          preload="metadata"
+          onLoadedData={() => setReady(true)}
+          onError={() => setReady(true)}
+        />
+      ) : null}
+      {!ready && <ThumbShimmer $h="100%" $r="0" />}
+      <ThumbOverlay />
+      {isProcessing(project.status) && (
+        <ThumbProcessing>AI editing…</ThumbProcessing>
+      )}
+      <ThumbBadge>{modeLabel(project.mode)}</ThumbBadge>
+    </Thumb>
+  )
+}
+
+function ProjectGridSkeleton() {
+  return (
+    <Grid aria-busy="true" aria-label="Loading projects">
+      {Array.from({ length: 6 }, (_, i) => (
+        <CardSkeleton key={i}>
+          <Skeleton $h="10.5rem" $r="0" />
+          <CardBody>
+            <Skeleton $w="72%" $h="1rem" />
+            <Skeleton $w="48%" $h="0.7rem" $mt="0.35rem" />
+            <Skeleton $w="62%" $h="0.65rem" $mt="0.85rem" />
+          </CardBody>
+        </CardSkeleton>
+      ))}
+    </Grid>
+  )
+}
+
+function StatsSkeleton() {
+  return (
+    <Stats aria-busy="true" aria-label="Loading stats">
+      {Array.from({ length: 4 }, (_, i) => (
+        <Stat key={i}>
+          <Skeleton $w="5.5rem" $h="0.65rem" />
+          <Skeleton $w="3.2rem" $h="1.55rem" $mt="0.7rem" />
+          <Skeleton $w="8rem" $h="0.6rem" $mt="0.45rem" />
+        </Stat>
+      ))}
+    </Stats>
+  )
+}
 
 const Quick = styled.div`
   display: grid;
@@ -472,19 +551,38 @@ const Quick = styled.div`
 `
 
 const QuickCard = styled(Link)`
-  display: block;
-  padding: ${({ theme }) => theme.space.xl};
+  display: grid;
+  grid-template-columns: 2.1rem 1fr;
+  gap: 0.85rem;
+  align-items: start;
+  padding: 1rem 1.1rem;
   border-radius: ${({ theme }) => theme.radii.xl};
   border: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.surface};
+  box-shadow: ${({ theme }) => theme.shadows.sm};
   transition:
     border-color ${({ theme }) => theme.transitions.fast},
-    transform ${({ theme }) => theme.transitions.normal};
+    transform ${({ theme }) => theme.transitions.normal},
+    box-shadow ${({ theme }) => theme.transitions.normal};
 
   &:hover {
     border-color: ${({ theme }) => theme.colors.primaryMuted};
     transform: translateY(-2px);
+    box-shadow: ${({ theme }) => theme.shadows.md};
   }
+`
+
+const QuickMark = styled.span`
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 0.65rem;
+  background: ${({ theme }) => theme.colors.primarySoft};
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-family: ${({ theme }) => theme.fonts.mono};
 `
 
 const QuickLabel = styled.p`
@@ -493,7 +591,7 @@ const QuickLabel = styled.p`
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.primary};
-  margin-bottom: ${({ theme }) => theme.space.sm};
+  margin-bottom: 0.25rem;
 `
 
 const QuickTitle = styled.p`
@@ -528,11 +626,7 @@ export function DashboardPage() {
         ? (remaining / quota) * 100
         : 0
 
-  const processing = projects.filter((p) =>
-    ['Queued', 'Analyzing', 'Preparing edit', 'Rendering', 'Uploading'].includes(
-      p.status,
-    ),
-  ).length
+  const processing = projects.filter((p) => isProcessing(p.status)).length
   const completed = projects.filter((p) => p.status === 'Completed').length
   const failed = projects.filter((p) => p.status === 'Failed').length
   const firstName = user?.name?.split(' ')[0]
@@ -578,57 +672,57 @@ export function DashboardPage() {
         </HeroPanel>
       </Hero>
 
-      <Stats>
-        <Stat $accent>
-          <StatTop>
-            <StatLabel>Credits left</StatLabel>
-            <StatIcon>CR</StatIcon>
-          </StatTop>
-          <StatValue>
-            {user?.planId === 'unlimited' ? '∞' : remaining}
-          </StatValue>
-          <StatHint>
-            {user?.planId === 'unlimited'
-              ? 'Unlimited plan'
-              : 'Used only after successful renders'}
-          </StatHint>
-        </Stat>
-        <Stat>
-          <StatTop>
-            <StatLabel>Processing</StatLabel>
-            <StatIcon>…</StatIcon>
-          </StatTop>
-          <StatValue>{processing}</StatValue>
-          <StatHint>Jobs in the pipeline right now</StatHint>
-        </Stat>
-        <Stat>
-          <StatTop>
-            <StatLabel>Completed</StatLabel>
-            <StatIcon>OK</StatIcon>
-          </StatTop>
-          <StatValue>{completed}</StatValue>
-          <StatHint>Ready to preview & download</StatHint>
-        </Stat>
-        <Stat>
-          <StatTop>
-            <StatLabel>Failed</StatLabel>
-            <StatIcon>!</StatIcon>
-          </StatTop>
-          <StatValue>{failed}</StatValue>
-          <StatHint>Retry without losing a credit</StatHint>
-        </Stat>
-      </Stats>
+      {loading ? (
+        <StatsSkeleton />
+      ) : (
+        <Stats>
+          <Stat $accent>
+            <StatTop>
+              <StatLabel>Projects</StatLabel>
+              <StatIcon>ALL</StatIcon>
+            </StatTop>
+            <StatValue>{projects.length}</StatValue>
+            <StatHint>In your library</StatHint>
+          </Stat>
+          <Stat>
+            <StatTop>
+              <StatLabel>In progress</StatLabel>
+              <StatIcon>…</StatIcon>
+            </StatTop>
+            <StatValue>{processing}</StatValue>
+            <StatHint>Jobs in the pipeline</StatHint>
+          </Stat>
+          <Stat>
+            <StatTop>
+              <StatLabel>Ready</StatLabel>
+              <StatIcon>OK</StatIcon>
+            </StatTop>
+            <StatValue>{completed}</StatValue>
+            <StatHint>Preview & download</StatHint>
+          </Stat>
+          <Stat>
+            <StatTop>
+              <StatLabel>Failed</StatLabel>
+              <StatIcon>!</StatIcon>
+            </StatTop>
+            <StatValue>{failed}</StatValue>
+            <StatHint>Retry without losing a credit</StatHint>
+          </Stat>
+        </Stats>
+      )}
 
       <SectionHead>
         <div>
           <SectionTitle>Your projects</SectionTitle>
           <SectionLead>
-            {projects.length === 0
-              ? 'No projects yet — start with a raw upload.'
-              : `${projects.length} project${projects.length === 1 ? '' : 's'} in your library`}
+            {loading
+              ? 'Loading your library…'
+              : projects.length === 0
+                ? 'No projects yet — start with a raw upload.'
+                : `${projects.length} project${projects.length === 1 ? '' : 's'} in your library`}
           </SectionLead>
         </div>
-        {projects.length > 0 && (
+        {!loading && projects.length > 0 && (
           <Button as={Link} to={ROUTES.newProject} $variant="secondary">
             New project
           </Button>
@@ -636,7 +730,7 @@ export function DashboardPage() {
       </SectionHead>
 
       {loading ? (
-        <Loading>Loading your projects…</Loading>
+        <ProjectGridSkeleton />
       ) : projects.length === 0 ? (
         <Empty>
           <EmptyMark>01</EmptyMark>
@@ -653,20 +747,7 @@ export function DashboardPage() {
         <Grid>
           {projects.map((project) => (
             <ProjectCard key={project.id} to={ROUTES.project(project.id)}>
-              <Thumb $mode={project.mode}>
-                {project.previewUrl ? (
-                  <video src={project.previewUrl} muted playsInline preload="metadata" />
-                ) : null}
-                <ThumbOverlay />
-                {['Queued', 'Analyzing', 'Preparing edit', 'Rendering', 'Uploading'].includes(
-                  project.status,
-                ) && (
-                  <ThumbProcessing>
-                    AI editing…
-                  </ThumbProcessing>
-                )}
-                <ThumbBadge>{modeLabel(project.mode)}</ThumbBadge>
-              </Thumb>
+              <ProjectThumb project={project} />
               <CardBody>
                 <CardTop>
                   <CardTitle>
@@ -699,19 +780,28 @@ export function DashboardPage() {
 
       <Quick>
         <QuickCard to={ROUTES.newProject}>
-          <QuickLabel>Create</QuickLabel>
-          <QuickTitle>Upload & edit</QuickTitle>
-          <QuickText>Start a new job with mode and export options.</QuickText>
+          <QuickMark>+</QuickMark>
+          <div>
+            <QuickLabel>Create</QuickLabel>
+            <QuickTitle>Upload & edit</QuickTitle>
+            <QuickText>Start a new job with mode and export options.</QuickText>
+          </div>
         </QuickCard>
         <QuickCard to={ROUTES.subscription}>
-          <QuickLabel>Plan</QuickLabel>
-          <QuickTitle>Credits & billing</QuickTitle>
-          <QuickText>Upgrade, downgrade, or check remaining edits.</QuickText>
+          <QuickMark>◇</QuickMark>
+          <div>
+            <QuickLabel>Plan</QuickLabel>
+            <QuickTitle>Credits & billing</QuickTitle>
+            <QuickText>Upgrade, downgrade, or check remaining edits.</QuickText>
+          </div>
         </QuickCard>
         <QuickCard to={ROUTES.account}>
-          <QuickLabel>Account</QuickLabel>
-          <QuickTitle>Profile & password</QuickTitle>
-          <QuickText>Update name, email, and sign-in security.</QuickText>
+          <QuickMark>◎</QuickMark>
+          <div>
+            <QuickLabel>Account</QuickLabel>
+            <QuickTitle>Profile & password</QuickTitle>
+            <QuickText>Update name, email, and sign-in security.</QuickText>
+          </div>
         </QuickCard>
       </Quick>
     </Page>

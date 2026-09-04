@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import { adminApi } from '@/api/adminApi'
-import { Button, ErrorText, Input } from '@/components/ui'
+import { Button, ErrorText, Input, Skeleton } from '@/components/ui'
 import { PLANS, ROUTES } from '@/constants'
 import type { PlanId, User, UserRole } from '@/types/app'
 
@@ -256,7 +256,28 @@ export function AdminUsersPage() {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {loading
+              ? Array.from({ length: 8 }, (_, i) => (
+                  <tr key={`sk-${i}`}>
+                    <td>
+                      <Skeleton $w="7rem" $h="0.8rem" />
+                      <Skeleton $w="11rem" $h="0.65rem" $mt="0.35rem" />
+                    </td>
+                    <td>
+                      <Skeleton $w="4.5rem" $h="0.75rem" />
+                    </td>
+                    <td>
+                      <Skeleton $w="3.4rem" $h="1.35rem" $r="999px" />
+                    </td>
+                    <td>
+                      <Skeleton $w="3.6rem" $h="1.35rem" $r="999px" />
+                    </td>
+                    <td>
+                      <Skeleton $w="4.4rem" $h="1.7rem" $r="0.55rem" />
+                    </td>
+                  </tr>
+                ))
+              : users.map((user) => (
               <tr key={user.id}>
                 <td>
                   <strong>{user.name}</strong>
