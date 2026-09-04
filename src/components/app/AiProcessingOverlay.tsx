@@ -181,28 +181,54 @@ const Progress = styled.div`
   overflow: hidden;
   background: rgba(248, 250, 252, 0.12);
   width: min(100%, 14rem);
-
-  &::after {
-    content: '';
-    display: block;
-    height: 100%;
-    width: 42%;
-    border-radius: inherit;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      #c4b5fd,
-      #a78bfa,
-      transparent
-    );
-    background-size: 200% 100%;
-    animation: ${shimmer} 1.4s linear infinite;
-  }
 `
 
-export function AiProcessingOverlay({ status }: { status: string }) {
+const ProgressFill = styled.div<{ $value: number }>`
+  height: 100%;
+  width: ${({ $value }) => `${Math.min(100, Math.max(0, $value))}%`};
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #c4b5fd,
+    #a78bfa,
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: ${shimmer} 1.4s linear infinite;
+  transition: width 0.35s ease;
+`
+
+function statusProgress(status: string) {
+  switch (status) {
+    case 'Uploading':
+      return 4
+    case 'Queued':
+      return 6
+    case 'Analyzing':
+      return 20
+    case 'Preparing edit':
+      return 48
+    case 'Rendering':
+      return 62
+    default:
+      return 8
+  }
+}
+
+export function AiProcessingOverlay({
+  status,
+  progress,
+}: {
+  status: string
+  progress?: number
+}) {
   const active = stepIndex(status)
   const copy = COPY[status] || 'AI is editing your video…'
+  const value =
+    typeof progress === 'number' && Number.isFinite(progress)
+      ? Math.min(100, Math.max(0, progress))
+      : statusProgress(status)
 
   return (
     <Wrap role="status" aria-live="polite" aria-busy="true">
@@ -230,7 +256,15 @@ export function AiProcessingOverlay({ status }: { status: string }) {
             )
           })}
         </Track>
-        <Progress aria-hidden />
+        <Progress
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(value)}
+          aria-label={`${status} ${Math.round(value)} percent`}
+        >
+          <ProgressFill $value={value} />
+        </Progress>
       </div>
     </Wrap>
   )

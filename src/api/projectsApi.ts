@@ -175,16 +175,12 @@ async function uploadFileResumable(
 
 async function pollProject(
   id: string,
-  onStatus: (status: ProjectStatus) => void,
+  onUpdate: (project: VideoProject) => void,
 ): Promise<VideoProject> {
-  let last: ProjectStatus | null = null
-  for (let i = 0; i < 120; i++) {
+  for (let i = 0; i < 180; i++) {
     await new Promise((r) => setTimeout(r, 1000))
     const { project } = await apiFetch<ProjectResponse>(`/projects/${id}`)
-    if (project.status !== last) {
-      last = project.status
-      onStatus(project.status)
-    }
+    onUpdate(project)
     if (TERMINAL.includes(project.status)) return project
   }
   throw new Error('Processing timed out. Refresh and check project status.')
@@ -284,24 +280,24 @@ export const projectsApi = {
   async startProcessing(
     id: string,
     _userId: string,
-    onStatus: (status: ProjectStatus) => void,
+    onUpdate: (project: VideoProject) => void,
   ): Promise<VideoProject> {
     const started = await apiFetch<ProcessResponse>(`/projects/${id}/process`, {
       method: 'POST',
     })
-    onStatus(started.project.status)
-    return pollProject(id, onStatus)
+    onUpdate(started.project)
+    return pollProject(id, onUpdate)
   },
 
   async retry(
     id: string,
     _userId: string,
-    onStatus: (s: ProjectStatus) => void,
+    onUpdate: (project: VideoProject) => void,
   ): Promise<VideoProject> {
     const started = await apiFetch<ProcessResponse>(`/projects/${id}/retry`, {
       method: 'POST',
     })
-    onStatus(started.project.status)
-    return pollProject(id, onStatus)
+    onUpdate(started.project)
+    return pollProject(id, onUpdate)
   },
 }

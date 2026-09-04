@@ -478,12 +478,18 @@ export function ProjectDetailPage() {
                     data-dimmed={processing ? 'true' : 'false'}
                   />
                   {processing && (
-                    <AiProcessingOverlay status={project.status} />
+                    <AiProcessingOverlay
+                      status={project.status}
+                      progress={project.progressPercent}
+                    />
                   )}
                 </VideoBox>
               ) : processing ? (
                 <VideoBox>
-                  <AiProcessingOverlay status={project.status} />
+                  <AiProcessingOverlay
+                    status={project.status}
+                    progress={project.progressPercent}
+                  />
                 </VideoBox>
               ) : (
                 <HelpText>No preview file available yet.</HelpText>

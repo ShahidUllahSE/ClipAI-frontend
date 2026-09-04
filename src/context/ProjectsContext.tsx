@@ -11,7 +11,6 @@ import { projectsApi } from '@/api'
 import { useAuth } from '@/context/AuthContext'
 import type {
   CreateProjectInput,
-  ProjectStatus,
   UploadProgress,
   VideoProject,
 } from '@/types/app'
@@ -59,12 +58,45 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     void refresh()
   }, [refresh])
 
-  const patchLocal = useCallback((id: string, status: ProjectStatus) => {
-    setProjects((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, status, updatedAt: new Date().toISOString() } : p,
-      ),
+  const hasProcessing =
+    processingIds.size > 0 ||
+    projects.some(
+      (project) =>
+        project.status === 'Queued' ||
+        project.status === 'Analyzing' ||
+        project.status === 'Preparing edit' ||
+        project.status === 'Rendering' ||
+        project.status === 'Uploading',
     )
+
+  useEffect(() => {
+    if (!user || !hasProcessing) return
+    let cancelled = false
+    const tick = async () => {
+      try {
+        const list = await projectsApi.list(user.id)
+        if (!cancelled) setProjects(list)
+      } catch {
+        /* keep last snapshot */
+      }
+    }
+    const timer = window.setInterval(() => {
+      void tick()
+    }, 1000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [user, hasProcessing])
+
+  const applyProject = useCallback((project: VideoProject) => {
+    setProjects((prev) => {
+      const index = prev.findIndex((p) => p.id === project.id)
+      if (index < 0) return [project, ...prev]
+      const next = [...prev]
+      next[index] = { ...next[index], ...project }
+      return next
+    })
   }, [])
 
   const create = useCallback(
@@ -108,11 +140,10 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       if (!user) throw new Error('Not signed in.')
       setProcessingIds((prev) => new Set(prev).add(id))
       try {
-        const onStatus = (status: ProjectStatus) => patchLocal(id, status)
         if (kind === 'retry') {
-          await projectsApi.retry(id, user.id, onStatus)
+          await projectsApi.retry(id, user.id, applyProject)
         } else {
-          await projectsApi.startProcessing(id, user.id, onStatus)
+          await projectsApi.startProcessing(id, user.id, applyProject)
         }
         await refresh()
         await refreshUser()
@@ -124,7 +155,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         })
       }
     },
-    [user, patchLocal, refresh, refreshUser],
+    [user, applyProject, refresh, refreshUser],
   )
 
   const process = useCallback(

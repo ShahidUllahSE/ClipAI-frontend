@@ -92,6 +92,8 @@ export interface VideoProject {
   createdAt: string
   updatedAt: string
   errorMessage?: string
+  progressPercent?: number
+  progressNote?: string
   /** Prefer outputUrl when completed; else source */
   previewUrl?: string
   outputUrl?: string
