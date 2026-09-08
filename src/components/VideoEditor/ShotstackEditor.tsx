@@ -687,6 +687,27 @@ const easeInOutCubic = (t: number) =>
 const easeInOutQuint = (t: number) =>
   t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2
 
+const interpolateManualZoom = (
+  frames: Array<{ time: number; zoom: number }>,
+  time: number,
+  fallback: number,
+) => {
+  if (!frames.length) return fallback
+  const sorted = [...frames].sort((a, b) => a.time - b.time)
+  if (time <= sorted[0].time) return sorted[0].zoom
+  const last = sorted[sorted.length - 1]
+  if (time >= last.time) return last.zoom
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i]
+    const b = sorted[i + 1]
+    if (time >= a.time && time <= b.time) {
+      const t = (time - a.time) / Math.max(0.001, b.time - a.time)
+      return a.zoom + (b.zoom - a.zoom) * t
+    }
+  }
+  return fallback
+}
+
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
 const formatTime = (seconds: number) => {
@@ -751,6 +772,9 @@ const buildTimelineJson = (
     zoom?: number
     transitionDuration?: number
     transitionSpeed?: TransitionSpeedId
+    applyClipEffects?: boolean
+    clipEffects?: TransitionId[]
+    zoomKeyframes?: Array<{ time: number; zoom: number }>
   } = {},
 ) => ({
   timeline: {
@@ -779,6 +803,12 @@ const buildTimelineJson = (
     segments: segments.map((segment) => ({
       start: Number(segment.start.toFixed(2)),
       end: Number(segment.end.toFixed(2)),
+    })),
+    applyClipEffects: Boolean(extras.applyClipEffects),
+    clipEffects: extras.clipEffects ?? [],
+    zoomKeyframes: (extras.zoomKeyframes ?? []).map((frame) => ({
+      time: Number(frame.time.toFixed(2)),
+      zoom: Number(frame.zoom.toFixed(2)),
     })),
     effects: selectedEffect ? [{ id: selectedEffect.id, name: selectedEffect.name, filter: selectedEffect.filter }] : [],
     transition: videoTransition !== 'none'
@@ -815,6 +845,12 @@ const buildTimelineJson = (
     speed: extras.speed ?? 1,
     crop: extras.crop ?? 'none',
     zoom: extras.zoom ?? 1,
+    applyClipEffects: Boolean(extras.applyClipEffects),
+    clipEffects: extras.clipEffects ?? [],
+    zoomKeyframes: (extras.zoomKeyframes ?? []).map((frame) => ({
+      time: Number(frame.time.toFixed(2)),
+      zoom: Number(frame.zoom.toFixed(2)),
+    })),
     captionsEnabled: Boolean(extras.captionsEnabled),
     captionText: extras.captionText || '',
     captionCues: extras.captionCues ?? [],
@@ -860,6 +896,9 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
   const [keyframes, setKeyframes] = useState<number[]>([])
   const [segments, setSegments] = useState<Array<{ start: number; end: number }>>([])
   const [videoZoom, setVideoZoom] = useState(1)
+  const [zoomKeyframes, setZoomKeyframes] = useState<Array<{ time: number; zoom: number }>>([])
+  const [applyClipEffects, setApplyClipEffects] = useState(false)
+  const [clipEffects, setClipEffects] = useState<TransitionId[]>([])
   const [videoTransition, setVideoTransition] = useState<TransitionId>('punch')
   const [transitionSpeedId, setTransitionSpeedId] = useState<TransitionSpeedId>('smooth')
   const [selectedEffect, setSelectedEffect] = useState<EffectPreset>(EFFECT_PRESETS[0])
@@ -892,6 +931,9 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
     zoom: videoZoom,
     transitionDuration,
     transitionSpeed: transitionSpeedId,
+    applyClipEffects,
+    clipEffects,
+    zoomKeyframes,
   }
 
   const notifyTimelineChange = (json: any) => {
@@ -978,6 +1020,9 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
     setKeyframes(autoKeyframes)
     setSegments(defaultSegments)
     setVideoZoom(1)
+    setZoomKeyframes([])
+    setApplyClipEffects(false)
+    setClipEffects([])
     setVideoTransition('punch')
     setCaptionsEnabled(false)
     setCaptionText('')
@@ -1000,7 +1045,7 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
     if (!sourceUrl) return
     const current = buildTimelineJson(sourceUrl, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition, editorExtras)
     notifyTimelineChange(current)
-  }, [sourceUrl, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition, playbackSpeed, cropPreset, captionsEnabled, captionText, captionCues, captionFontFamily, captionFontSize, captionColor, videoZoom, transitionSpeedId, transitionDuration])
+  }, [sourceUrl, trimStart, trimEnd, keyframes, segments, selectedEffect, videoTransition, playbackSpeed, cropPreset, captionsEnabled, captionText, captionCues, captionFontFamily, captionFontSize, captionColor, videoZoom, transitionSpeedId, transitionDuration, applyClipEffects, clipEffects, zoomKeyframes])
 
   useEffect(() => {
     if (videoRef.current) {
@@ -1162,13 +1207,16 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
   }
 
   const handleZoom = (direction: 'in' | 'out') => {
-    setVideoZoom((value) => {
-      const next = direction === 'in' ? value + 0.15 : value - 0.15
-      const clamped = clamp(next, 0.8, 2.4)
-      setToolMessage(`Zoom ${clamped.toFixed(2)}×`)
-      return clamped
+    const current = interpolateManualZoom(zoomKeyframes, playhead, videoZoom)
+    const next = clamp(current + (direction === 'in' ? 0.15 : -0.15), 0.8, 2.4)
+    const at = Number(playhead.toFixed(2))
+    setVideoZoom(next)
+    setZoomKeyframes((prev) => {
+      const without = prev.filter((frame) => Math.abs(frame.time - at) > 0.12)
+      return [...without, { time: at, zoom: next }].sort((a, b) => a.time - b.time)
     })
     setActiveTool('zoom')
+    setToolMessage(`Zoom ${next.toFixed(2)}× at ${formatTime(playhead)}`)
   }
 
   const cycleCrop = (next?: CropId) => {
@@ -1283,6 +1331,8 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
   }
 
   const applyTransition = (transitionId: TransitionId) => {
+    setApplyClipEffects(false)
+    setClipEffects([])
     setVideoTransition(transitionId)
     setActiveTool('transition')
 
@@ -1312,6 +1362,35 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
       const merged = [...current, startTime, endTime].filter((value, index, arr) => arr.indexOf(value) === index)
       return [...merged].sort((a, b) => a - b)
     })
+  }
+
+  const applyEffectsToAllClips = () => {
+    if (videoTransition === 'none') {
+      setToolMessage('Pick a transition first (Zoom in, Slide, Blur…), then Apply to all clips.')
+      setActiveTool('transition')
+      return
+    }
+    let segs = segments
+    if (segs.length < 2) {
+      const marks = keyframes.length >= 2 ? [...keyframes].sort((a, b) => a - b) : generateAutoKeyframes(totalDuration)
+      segs =
+        marks.length > 1
+          ? marks.slice(1).map((time, index) => ({ start: marks[index], end: time }))
+          : [{ start: 0, end: totalDuration }]
+      setSegments(segs)
+    }
+    const fx = segs.map(() => videoTransition)
+    setClipEffects(fx)
+    setApplyClipEffects(true)
+    setActiveTool('transition')
+    const name = TRANSITION_PRESETS.find((item) => item.id === videoTransition)?.name ?? videoTransition
+    setToolMessage(`Applied ${name} to all ${segs.length} clips. Play to preview.`)
+  }
+
+  const clearClipEffects = () => {
+    setApplyClipEffects(false)
+    setClipEffects([])
+    setToolMessage('Per-clip effects cleared. Transitions work as before.')
   }
 
   const seekToTime = (nextTime: number) => {
@@ -1356,16 +1435,28 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
   // Transition progress is driven by the user-selected duration (not the whole clip).
   const clipSpan = Math.max(0.2, trimEnd - trimStart)
   const localDuration = clamp(transitionDuration, 0.4, clipSpan)
+  const activeClipIndex = Math.max(
+    0,
+    segments.findIndex((segment) => playhead >= segment.start && playhead <= segment.end),
+  )
+  const previewTransition: TransitionId =
+    applyClipEffects && clipEffects[activeClipIndex]
+      ? clipEffects[activeClipIndex]
+      : videoTransition
 
   let rawTransitionProgress = 0
-  if (videoTransition === 'none') {
+  if (previewTransition === 'none') {
     rawTransitionProgress = 0
-  } else if (videoTransition === 'zoom-out') {
+  } else if (applyClipEffects) {
+    const active = segments[activeClipIndex] ?? { start: trimStart, end: trimEnd }
+    const span = Math.max(0.2, active.end - active.start)
+    rawTransitionProgress = clamp((playhead - active.start) / span, 0, 1)
+  } else if (previewTransition === 'zoom-out') {
     const windowStart = Math.max(trimStart, trimEnd - localDuration)
     rawTransitionProgress = clamp((playhead - windowStart) / localDuration, 0, 1)
-  } else if (videoTransition === 'ken-burns') {
+  } else if (previewTransition === 'ken-burns') {
     rawTransitionProgress = clamp((playhead - trimStart) / clipSpan, 0, 1)
-  } else if (videoTransition === 'punch') {
+  } else if (previewTransition === 'punch') {
     const active = segments.find((segment) => playhead >= segment.start && playhead <= segment.end)
     const span = Math.max(0.2, (active?.end ?? trimEnd) - (active?.start ?? trimStart))
     const start = active?.start ?? trimStart
@@ -1385,7 +1476,7 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
   let transitionFilterExtra = ''
   let flashIntensity = 0
 
-  switch (videoTransition) {
+  switch (previewTransition) {
     case 'punch': {
       const activeIndex = Math.max(
         0,
@@ -1444,6 +1535,11 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
     }
     default:
       break
+  }
+
+  if (zoomKeyframes.length) {
+    const manual = interpolateManualZoom(zoomKeyframes, playhead, 1)
+    effectiveZoom = clamp(effectiveZoom * manual, 0.8, 2.4)
   }
 
   const combinedFilter = `${selectedEffect.filter}${transitionFilterExtra}`
@@ -1620,7 +1716,8 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
           <>
             <MiniControl type="button" onClick={() => handleZoom('out')}>Zoom −</MiniControl>
             <MiniControl type="button" onClick={() => handleZoom('in')}>Zoom +</MiniControl>
-            <MiniControl type="button" onClick={() => { setVideoZoom(1); setToolMessage('Zoom reset to 1×') }}>Reset</MiniControl>
+            <MiniControl type="button" onClick={() => { setVideoZoom(1); setZoomKeyframes([]); setToolMessage('Zoom reset to 1×') }}>Reset</MiniControl>
+            <ToolHint>Move the playhead, then Zoom + / −. That zoom stays on that moment.</ToolHint>
           </>
         )}
 
@@ -1796,10 +1893,25 @@ export const ShotstackEditor = forwardRef<ShotstackEditorHandle, Props>(function
       <EffectsSection ref={transitionsRef}>
         <EffectsLabel>
           Transitions
-          {videoTransition !== 'none'
+          {applyClipEffects
+            ? ` · ${activeTransition.name} on all clips`
+            : videoTransition !== 'none'
             ? ` · ${activeTransition.name} · ${transitionDuration.toFixed(1)}s`
             : ''}
         </EffectsLabel>
+        <ToolPanel>
+          <MiniControl type="button" $active={applyClipEffects} onClick={applyEffectsToAllClips}>
+            Apply to all clips
+          </MiniControl>
+          {applyClipEffects && (
+            <MiniControl type="button" onClick={clearClipEffects}>
+              Clear
+            </MiniControl>
+          )}
+          <ToolHint>
+            Pick one transition (Zoom in, Slide, Blur…), then Apply to all clips. That same effect goes on every clip.
+          </ToolHint>
+        </ToolPanel>
         <EffectsStrip>
           {TRANSITION_PRESETS.map((transition) => (
             <EffectChip
