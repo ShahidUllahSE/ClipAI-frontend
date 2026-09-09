@@ -396,8 +396,8 @@ const MODES: { id: EditingModeId; name: string; text: string; live: boolean }[] 
     {
       id: 'rapid-cut',
       name: 'Rapid-cut',
-      text: 'Faster pacing — preview path for now.',
-      live: false,
+      text: 'Faster pacing — keep energy peaks, drop slow bits.',
+      live: true,
     },
     {
       id: 'asmr',
@@ -827,7 +827,7 @@ export function NewProjectPage() {
                 </Select>
               </Field>
 
-              {(mode === 'talking-head' || mode === 'asmr') && (
+              {(mode === 'talking-head' || mode === 'asmr' || mode === 'rapid-cut') && (
                 <Field>
                   Silence sensitivity
                   <Select
