@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import styled, { keyframes } from 'styled-components'
 import {
   AiProcessingOverlay,
   isProjectProcessing,
 } from '@/components/app/AiProcessingOverlay'
 import { EditResultsPanel } from '@/components/app/EditResultsPanel'
-import { Button, ErrorText, HelpText, Input } from '@/components/ui'
+import { Button, ErrorText, HelpText, Input, Skeleton } from '@/components/ui'
 import { useProjects } from '@/context/ProjectsContext'
 import { ROUTES } from '@/constants'
+import type { VideoProject } from '@/types/app'
 import {
   formatBytes,
   formatDuration,
@@ -315,40 +316,118 @@ const OptionChip = styled.span`
   border: 1px solid ${({ theme }) => theme.colors.primaryMuted};
 `
 
+function seededProject(
+  id: string,
+  state: unknown,
+): VideoProject | undefined {
+  if (!state || typeof state !== 'object' || !('project' in state)) return
+  const project = (state as { project?: VideoProject }).project
+  return project?.id === id ? project : undefined
+}
+
+function ProjectDetailSkeleton() {
+  return (
+    <Page aria-busy="true" aria-label="Loading project">
+      <TopBar>
+        <Back to={ROUTES.dashboard}>← Dashboard</Back>
+      </TopBar>
+      <HeaderBlock>
+        <TitleWrap>
+          <Skeleton $w="16rem" $h="1.6rem" />
+          <MetaLine>
+            <Skeleton $w="4.5rem" $h="1.2rem" $r="999px" />
+            <Skeleton $w="5.5rem" $h="1.2rem" $r="999px" />
+            <Skeleton $w="3.5rem" $h="1.2rem" $r="999px" />
+          </MetaLine>
+        </TitleWrap>
+      </HeaderBlock>
+      <Studio>
+        <Panel>
+          <PanelHead>
+            <Skeleton $w="7rem" $h="0.7rem" />
+          </PanelHead>
+          <PreviewStage>
+            <VideoBox>
+              <Skeleton $h="100%" $r="0" $tone="dark" />
+            </VideoBox>
+          </PreviewStage>
+        </Panel>
+        <SideStack>
+          <Panel>
+            <PanelHead>
+              <Skeleton $w="4.5rem" $h="0.7rem" />
+            </PanelHead>
+            <PanelBody>
+              <Facts>
+                {Array.from({ length: 6 }, (_, i) => (
+                  <Fact key={i}>
+                    <Skeleton $w="3.2rem" $h="0.55rem" />
+                    <Skeleton $w="70%" $h="0.85rem" $mt="0.35rem" />
+                  </Fact>
+                ))}
+              </Facts>
+            </PanelBody>
+          </Panel>
+        </SideStack>
+      </Studio>
+    </Page>
+  )
+}
+
 export function ProjectDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const {
     get,
+    fetchById,
+    upsert,
     updateTitle,
     remove,
     process,
     retry,
     processingIds,
-    refresh,
+    loading: listLoading,
   } = useProjects()
-  const project = get(id)
+  const fromSubmit = seededProject(id, location.state)
+  const project = get(id) ?? fromSubmit
   const [title, setTitle] = useState('')
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [lookupDone, setLookupDone] = useState(Boolean(project))
   const processing =
     processingIds.has(id) || isProjectProcessing(project?.status ?? '')
 
   useEffect(() => {
-    void refresh()
-  }, [refresh, id])
+    if (fromSubmit) upsert(fromSubmit)
+  }, [fromSubmit, upsert])
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchById(id).then((found) => {
+      if (cancelled) return
+      setLookupDone(true)
+      if (!found && fromSubmit) upsert(fromSubmit)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [id, fetchById, fromSubmit, upsert])
 
   useEffect(() => {
     if (project) setTitle(project.generatedTitle || project.title)
   }, [project])
 
   if (!project) {
+    if (listLoading || !lookupDone) {
+      return <ProjectDetailSkeleton />
+    }
     return (
       <Page>
+        <TopBar>
+          <Back to={ROUTES.dashboard}>← Dashboard</Back>
+        </TopBar>
         <Title>Project not found</Title>
-        <Button as={Link} to={ROUTES.dashboard} style={{ marginTop: '1rem' }}>
-          Back to dashboard
-        </Button>
       </Page>
     )
   }

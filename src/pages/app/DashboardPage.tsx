@@ -242,6 +242,7 @@ const SectionLead = styled.p`
   color: ${({ theme }) => theme.colors.textMuted};
   font-size: ${({ theme }) => theme.fontSizes.sm};
   margin-top: ${({ theme }) => theme.space.xs};
+  min-height: 1.25rem;
 `
 
 const Grid = styled.div`
@@ -714,13 +715,13 @@ export function DashboardPage() {
       <SectionHead>
         <div>
           <SectionTitle>Your projects</SectionTitle>
-          <SectionLead>
-            {loading
-              ? 'Loading your library…'
-              : projects.length === 0
+          {!loading && (
+            <SectionLead>
+              {projects.length === 0
                 ? 'No projects yet — start with a raw upload.'
                 : `${projects.length} project${projects.length === 1 ? '' : 's'} in your library`}
-          </SectionLead>
+            </SectionLead>
+          )}
         </div>
         {!loading && projects.length > 0 && (
           <Button as={Link} to={ROUTES.newProject} $variant="secondary">

@@ -550,7 +550,7 @@ export function NewProjectPage() {
       )
       setUploadProgress(100)
       void process(project.id)
-      navigate(ROUTES.project(project.id))
+      navigate(ROUTES.project(project.id), { state: { project } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed.')
     } finally {

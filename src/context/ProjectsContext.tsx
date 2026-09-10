@@ -24,6 +24,8 @@ interface ProjectsContextValue {
     onUploadProgress?: (progress: UploadProgress) => void,
   ) => Promise<VideoProject>
   get: (id: string) => VideoProject | undefined
+  fetchById: (id: string) => Promise<VideoProject | null>
+  upsert: (project: VideoProject) => void
   updateTitle: (id: string, generatedTitle: string) => Promise<void>
   remove: (id: string) => Promise<void>
   process: (id: string) => Promise<void>
@@ -45,7 +47,6 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       setLoading(false)
       return
     }
-    setLoading(true)
     try {
       const list = await projectsApi.list(user.id)
       setProjects(list)
@@ -117,6 +118,16 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     [projects],
   )
 
+  const fetchById = useCallback(
+    async (id: string) => {
+      if (!user || !id) return null
+      const project = await projectsApi.get(id, user.id)
+      if (project) applyProject(project)
+      return project
+    },
+    [user, applyProject],
+  )
+
   const updateTitle = useCallback(
     async (id: string, generatedTitle: string) => {
       if (!user) throw new Error('Not signed in.')
@@ -175,6 +186,8 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       refresh,
       create,
       get,
+      fetchById,
+      upsert: applyProject,
       updateTitle,
       remove,
       process,
@@ -187,6 +200,8 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       refresh,
       create,
       get,
+      fetchById,
+      applyProject,
       updateTitle,
       remove,
       process,
