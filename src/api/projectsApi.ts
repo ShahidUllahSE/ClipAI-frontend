@@ -178,7 +178,7 @@ async function pollProject(
   onUpdate: (project: VideoProject) => void,
 ): Promise<VideoProject> {
   for (let i = 0; i < 180; i++) {
-    await new Promise((r) => setTimeout(r, 1000))
+    await new Promise((r) => setTimeout(r, 2500))
     const { project } = await apiFetch<ProjectResponse>(`/projects/${id}`)
     onUpdate(project)
     if (TERMINAL.includes(project.status)) return project

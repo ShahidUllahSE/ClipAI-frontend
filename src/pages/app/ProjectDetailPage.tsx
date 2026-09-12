@@ -6,7 +6,14 @@ import {
   isProjectProcessing,
 } from '@/components/app/AiProcessingOverlay'
 import { EditResultsPanel } from '@/components/app/EditResultsPanel'
-import { Button, ErrorText, HelpText, Input, Skeleton } from '@/components/ui'
+import {
+  Button,
+  ConfirmModal,
+  ErrorText,
+  HelpText,
+  Input,
+  Skeleton,
+} from '@/components/ui'
 import { useProjects } from '@/context/ProjectsContext'
 import { ROUTES } from '@/constants'
 import type { VideoProject } from '@/types/app'
@@ -394,6 +401,8 @@ export function ProjectDetailPage() {
   const [title, setTitle] = useState('')
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [lookupDone, setLookupDone] = useState(Boolean(project))
   const processing =
     processingIds.has(id) || isProjectProcessing(project?.status ?? '')
@@ -478,9 +487,16 @@ export function ProjectDetailPage() {
   }
 
   const onDelete = async () => {
-    if (!confirm('Delete this project?')) return
-    await remove(project.id)
-    navigate(ROUTES.dashboard)
+    const id = project.id
+    setDeleting(true)
+    setDeleteOpen(false)
+    navigate(ROUTES.dashboard, { replace: true })
+    try {
+      await remove(id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete.')
+      setDeleting(false)
+    }
   }
 
   return (
@@ -680,7 +696,7 @@ export function ProjectDetailPage() {
                 <Button
                   type="button"
                   $variant="ghost"
-                  onClick={() => void onDelete()}
+                  onClick={() => setDeleteOpen(true)}
                 >
                   Delete
                 </Button>
@@ -702,6 +718,19 @@ export function ProjectDetailPage() {
           </Panel>
         </SideStack>
       </Studio>
+
+      <ConfirmModal
+        open={deleteOpen}
+        danger
+        busy={deleting}
+        title="Delete this video?"
+        description="The project, source file, and export will be removed. This cannot be undone."
+        detail={project.generatedTitle || project.title}
+        confirmLabel="Delete video"
+        cancelLabel="Keep video"
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => void onDelete()}
+      />
     </Page>
   )
 }

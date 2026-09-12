@@ -59,37 +59,6 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     void refresh()
   }, [refresh])
 
-  const hasProcessing =
-    processingIds.size > 0 ||
-    projects.some(
-      (project) =>
-        project.status === 'Queued' ||
-        project.status === 'Analyzing' ||
-        project.status === 'Preparing edit' ||
-        project.status === 'Rendering' ||
-        project.status === 'Uploading',
-    )
-
-  useEffect(() => {
-    if (!user || !hasProcessing) return
-    let cancelled = false
-    const tick = async () => {
-      try {
-        const list = await projectsApi.list(user.id)
-        if (!cancelled) setProjects(list)
-      } catch {
-        /* keep last snapshot */
-      }
-    }
-    const timer = window.setInterval(() => {
-      void tick()
-    }, 1000)
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-    }
-  }, [user, hasProcessing])
-
   const applyProject = useCallback((project: VideoProject) => {
     setProjects((prev) => {
       const index = prev.findIndex((p) => p.id === project.id)
@@ -156,7 +125,6 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         } else {
           await projectsApi.startProcessing(id, user.id, applyProject)
         }
-        await refresh()
         await refreshUser()
       } finally {
         setProcessingIds((prev) => {
@@ -166,7 +134,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         })
       }
     },
-    [user, applyProject, refresh, refreshUser],
+    [user, applyProject, refreshUser],
   )
 
   const process = useCallback(

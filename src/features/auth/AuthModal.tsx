@@ -94,6 +94,7 @@ const Field = styled.label`
 `
 
 const Input = styled.input`
+  width: 100%;
   padding: 0.85rem 1rem;
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radii.md};
@@ -103,6 +104,39 @@ const Input = styled.input`
   &:focus {
     outline: 2px solid ${({ theme }) => theme.colors.primaryMuted};
     border-color: ${({ theme }) => theme.colors.primary};
+  }
+`
+
+const PasswordWrap = styled.div`
+  position: relative;
+`
+
+const PasswordInput = styled(Input)`
+  padding-right: 3rem;
+`
+
+const TogglePassword = styled.button`
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  transform: translateY(-50%);
+  width: 2.4rem;
+  height: 2.15rem;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: ${({ theme }) => theme.radii.sm};
+  background: transparent;
+  color: ${({ theme }) => theme.colors.textMuted};
+  cursor: pointer;
+
+  svg {
+    display: block;
+  }
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.ink};
+    background: ${({ theme }) => theme.colors.elevated};
   }
 `
 
@@ -151,6 +185,7 @@ export function AuthModal() {
   const navigate = useNavigate()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     if (!isOpen) return
@@ -163,6 +198,7 @@ export function AuthModal() {
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKeyDown)
     setError('')
+    setShowPassword(false)
 
     return () => {
       document.body.style.overflow = previousOverflow
@@ -242,14 +278,42 @@ export function AuthModal() {
           </Field>
           <Field>
             Password
-            <Input
-              type="password"
-              name="password"
-              placeholder="••••••••"
-              required
-              minLength={6}
-              autoComplete={isLogin ? 'current-password' : 'new-password'}
-            />
+            <PasswordWrap>
+              <PasswordInput
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                placeholder="••••••••"
+                required
+                minLength={6}
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
+              />
+              <TogglePassword
+                type="button"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((open) => !open)}
+              >
+                {showPassword ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M3 3l18 18M10.6 10.7a2.5 2.5 0 003.5 3.5M9.9 5.6A10.8 10.8 0 0112 5.4c5.2 0 9.2 3.4 10.6 6.6a11.7 11.7 0 01-4.2 5.1M6.6 6.7A11.6 11.6 0 001.4 12C2.8 15.2 6.8 18.6 12 18.6c1.4 0 2.7-.2 3.9-.7"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M2 12s3.6-6.6 10-6.6S22 12 22 12s-3.6 6.6-10 6.6S2 12 2 12z"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                    />
+                    <circle cx="12" cy="12" r="2.6" stroke="currentColor" strokeWidth="1.8" />
+                  </svg>
+                )}
+              </TogglePassword>
+            </PasswordWrap>
           </Field>
           <Submit type="submit" disabled={busy}>
             {busy ? 'Please wait…' : isLogin ? 'Sign in' : 'Create account'}

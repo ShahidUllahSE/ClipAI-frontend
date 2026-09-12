@@ -1,7 +1,7 @@
 import styled, { css } from 'styled-components'
 
 export const Button = styled.button<{
-  $variant?: 'primary' | 'secondary' | 'ghost' | 'light'
+  $variant?: 'primary' | 'secondary' | 'ghost' | 'light' | 'danger'
   $size?: 'sm' | 'md'
 }>`
   display: inline-flex;
@@ -72,6 +72,26 @@ export const Button = styled.button<{
 
           &:hover {
             color: ${theme.colors.text};
+          }
+        `
+      case 'danger':
+        return `
+          background: ${theme.colors.error};
+          color: ${theme.colors.white};
+          box-shadow: ${
+            $size === 'sm'
+              ? '0 4px 12px rgba(220, 38, 38, 0.18)'
+              : '0 8px 20px rgba(220, 38, 38, 0.22)'
+          };
+
+          &:hover {
+            background: #b91c1c;
+          }
+
+          &:disabled {
+            opacity: 0.65;
+            transform: none;
+            cursor: wait;
           }
         `
       default:

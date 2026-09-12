@@ -1,26 +1,28 @@
-import { useCallback, useState, useRef, type DragEvent, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import styled, { keyframes } from 'styled-components'
-import { Button, ErrorText, HelpText } from '@/components/ui'
-import { useProjects } from '@/context/ProjectsContext'
-import { ROUTES } from '@/constants'
+import {
+  useCallback,
+  useState,
+  useRef,
+  type DragEvent,
+  type FormEvent,
+} from "react";
+import { useNavigate } from "react-router-dom";
+import styled, { keyframes } from "styled-components";
+import { Button, ErrorText, HelpText } from "@/components/ui";
+import { useProjects } from "@/context/ProjectsContext";
+import { ROUTES } from "@/constants";
 import {
   DEFAULT_PROJECT_OPTIONS,
   type EditingModeId,
   type ProjectOptions,
   type UploadProgress,
-} from '@/types/app'
-import {
-  formatBytes,
-  formatDuration,
-  validateVideoFile,
-} from '@/utils/video'
-import { ShotstackEditor } from '@/components/VideoEditor/ShotstackEditor'
+} from "@/types/app";
+import { formatBytes, formatDuration, validateVideoFile } from "@/utils/video";
+import { ShotstackEditor } from "@/components/VideoEditor/ShotstackEditor";
 
 const fade = keyframes`
   from { opacity: 0; transform: translateY(0.3rem); }
   to { opacity: 1; transform: translateY(0); }
-`
+`;
 
 const Page = styled.div`
   animation: ${fade} 0.35s ease both;
@@ -28,7 +30,7 @@ const Page = styled.div`
   width: 100%;
   min-width: 0;
   overflow-x: hidden;
-`
+`;
 
 const Header = styled.header`
   display: flex;
@@ -39,11 +41,11 @@ const Header = styled.header`
   margin-bottom: 0.9rem;
   padding-bottom: 0.85rem;
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-`
+`;
 
 const TitleBlock = styled.div`
   min-width: 0;
-`
+`;
 
 const Eyebrow = styled.p`
   margin: 0 0 0.2rem;
@@ -52,14 +54,14 @@ const Eyebrow = styled.p`
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.primary};
-`
+`;
 
 const Title = styled.h1`
   margin: 0;
   font-size: clamp(1.25rem, 2.4vw, 1.6rem);
   letter-spacing: -0.03em;
   line-height: 1.2;
-`
+`;
 
 const Lead = styled.p`
   margin: 0.3rem 0 0;
@@ -67,7 +69,7 @@ const Lead = styled.p`
   font-size: 0.8125rem;
   max-width: 34rem;
   line-height: 1.4;
-`
+`;
 
 const Layout = styled.form`
   display: grid;
@@ -83,7 +85,7 @@ const Layout = styled.form`
   > * {
     min-width: 0;
   }
-`
+`;
 
 const Panel = styled.section`
   border: 1px solid ${({ theme }) => theme.colors.border};
@@ -93,7 +95,7 @@ const Panel = styled.section`
   overflow: hidden;
   min-width: 0;
   max-width: 100%;
-`
+`;
 
 const PanelHead = styled.div`
   display: flex;
@@ -103,7 +105,7 @@ const PanelHead = styled.div`
   padding: 0.65rem 0.85rem;
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.elevated};
-`
+`;
 
 const PanelTitle = styled.h2`
   margin: 0;
@@ -112,7 +114,7 @@ const PanelTitle = styled.h2`
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.textMuted};
-`
+`;
 
 const Step = styled.span`
   display: inline-flex;
@@ -126,28 +128,28 @@ const Step = styled.span`
   color: ${({ theme }) => theme.colors.primary};
   font-size: 0.68rem;
   font-weight: 750;
-`
+`;
 
 const PanelBody = styled.div`
   padding: 0.85rem;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-`
+`;
 
 const Stack = styled.div`
   display: grid;
   gap: 0.85rem;
   min-width: 0;
   max-width: 100%;
-`
+`;
 
 const EditorShell = styled.div`
   width: 100%;
   max-width: 100%;
   min-width: 0;
   overflow: hidden;
-`
+`;
 
 const Dropzone = styled.div<{ $active: boolean; $hasFile: boolean }>`
   display: grid;
@@ -157,7 +159,7 @@ const Dropzone = styled.div<{ $active: boolean; $hasFile: boolean }>`
   border-radius: 0.85rem;
   border: 1.5px dashed
     ${({ theme, $active, $hasFile }) =>
-    $active || $hasFile ? theme.colors.primary : theme.colors.border};
+      $active || $hasFile ? theme.colors.primary : theme.colors.border};
   background: ${({ theme, $active, $hasFile }) =>
     $active || $hasFile
       ? theme.colors.primarySoft
@@ -173,7 +175,7 @@ const Dropzone = styled.div<{ $active: boolean; $hasFile: boolean }>`
     border-color: ${({ theme }) => theme.colors.primaryMuted};
     transform: translateY(-1px);
   }
-`
+`;
 
 const DropIcon = styled.div`
   width: 2.35rem;
@@ -187,30 +189,30 @@ const DropIcon = styled.div`
   font-size: 1.1rem;
   font-weight: 700;
   box-shadow: 0 8px 18px rgba(124, 58, 237, 0.28);
-`
+`;
 
 const DropTitle = styled.p`
   margin: 0;
   font-size: 0.9rem;
   font-weight: 650;
   color: ${({ theme }) => theme.colors.ink};
-`
+`;
 
 const DropMeta = styled.p`
   margin: 0.25rem 0 0;
   font-size: 0.75rem;
   color: ${({ theme }) => theme.colors.textMuted};
   line-height: 1.35;
-`
+`;
 
 const HiddenInput = styled.input`
   display: none;
-`
+`;
 
 const ModeGrid = styled.div`
   display: grid;
   gap: 0.45rem;
-`
+`;
 
 const ModeOption = styled.label<{ $active: boolean }>`
   display: grid;
@@ -221,7 +223,7 @@ const ModeOption = styled.label<{ $active: boolean }>`
   border-radius: 0.75rem;
   border: 1px solid
     ${({ theme, $active }) =>
-    $active ? theme.colors.primary : theme.colors.border};
+      $active ? theme.colors.primary : theme.colors.border};
   background: ${({ theme, $active }) =>
     $active ? theme.colors.primarySoft : theme.colors.surface};
   cursor: pointer;
@@ -238,14 +240,14 @@ const ModeOption = styled.label<{ $active: boolean }>`
     display: block;
     font-size: 0.84rem;
   }
-`
+`;
 
 const ModeText = styled.span`
   grid-column: 2;
   font-size: 0.72rem;
   color: ${({ theme }) => theme.colors.textMuted};
   line-height: 1.35;
-`
+`;
 
 const Field = styled.label`
   display: grid;
@@ -256,7 +258,7 @@ const Field = styled.label`
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.textMuted};
-`
+`;
 
 const Control = styled.input`
   padding: 0.55rem 0.7rem;
@@ -275,7 +277,7 @@ const Control = styled.input`
     border-color: ${({ theme }) => theme.colors.primary};
     background: #fff;
   }
-`
+`;
 
 const Select = styled.select`
   padding: 0.55rem 0.7rem;
@@ -298,7 +300,7 @@ const Select = styled.select`
   &:disabled {
     opacity: 0.55;
   }
-`
+`;
 
 const FieldGrid = styled.div`
   display: grid;
@@ -307,7 +309,7 @@ const FieldGrid = styled.div`
   @media (min-width: ${({ theme }) => theme.breakpoints.sm}) {
     grid-template-columns: 1fr 1fr;
   }
-`
+`;
 
 const SectionLabel = styled.p`
   margin: 0.65rem 0 0.4rem;
@@ -318,7 +320,7 @@ const SectionLabel = styled.p`
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: ${({ theme }) => theme.colors.primary};
-`
+`;
 
 const ToggleGrid = styled.div`
   display: grid;
@@ -327,7 +329,7 @@ const ToggleGrid = styled.div`
   @media (min-width: ${({ theme }) => theme.breakpoints.sm}) {
     grid-template-columns: 1fr 1fr;
   }
-`
+`;
 
 const Toggle = styled.label`
   display: flex;
@@ -346,7 +348,7 @@ const Toggle = styled.label`
   input {
     accent-color: ${({ theme }) => theme.colors.primary};
   }
-`
+`;
 
 const Footer = styled.div`
   margin-top: 0.75rem;
@@ -354,209 +356,221 @@ const Footer = styled.div`
   border-top: 1px solid ${({ theme }) => theme.colors.border};
   display: grid;
   gap: 0.55rem;
-`
+`;
 
 const Progress = styled.div`
   height: 0.35rem;
   border-radius: 999px;
   background: ${({ theme }) => theme.colors.elevated};
   overflow: hidden;
-`
+`;
 
 const ProgressBar = styled.div<{ $value: number }>`
   height: 100%;
   width: ${({ $value }) => `${$value}%`};
   background: linear-gradient(90deg, #a78bfa, #7c3aed);
   transition: width 0.2s ease;
-`
+`;
 
 const UploadStats = styled.p`
   margin: 0.35rem 0 0;
   color: ${({ theme }) => theme.colors.textMuted};
   font-size: 0.7rem;
   line-height: 1.35;
-`
+`;
 
 function formatRemaining(seconds: number | null) {
-  if (seconds == null || !Number.isFinite(seconds)) return 'calculating…'
-  if (seconds < 60) return `${Math.max(1, Math.ceil(seconds))}s`
-  const minutes = Math.floor(seconds / 60)
-  const remainder = Math.ceil(seconds % 60)
-  return `${minutes}m ${remainder}s`
+  if (seconds == null || !Number.isFinite(seconds)) return "calculating…";
+  if (seconds < 60) return `${Math.max(1, Math.ceil(seconds))}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.ceil(seconds % 60);
+  return `${minutes}m ${remainder}s`;
 }
 
-const MODES: { id: EditingModeId; name: string; text: string; live: boolean }[] =
-  [
-    {
-      id: 'talking-head',
-      name: 'Talking-head',
-      text: 'Silence removal + jump cuts for speech.',
-      live: true,
-    },
-    {
-      id: 'rapid-cut',
-      name: 'Rapid-cut',
-      text: 'Faster pacing — keep energy peaks, drop slow bits.',
-      live: true,
-    },
-    {
-      id: 'asmr',
-      name: 'ASMR & unboxing',
-      text: 'Keep product sounds, trim empty waits.',
-      live: true,
-    },
-    {
-      id: 'ai-combine',
-      name: 'AI Combine',
-      text: 'Gemini finds beautiful moments in both clips and blends them.',
-      live: true,
-    },
-  ]
+const MODES: {
+  id: EditingModeId;
+  name: string;
+  text: string;
+  live: boolean;
+}[] = [
+  {
+    id: "talking-head",
+    name: "Talking-head",
+    text: "Silence removal + jump cuts for speech.",
+    live: true,
+  },
+  {
+    id: "rapid-cut",
+    name: "Rapid-cut",
+    text: "Faster pacing — keep energy peaks, drop slow bits.",
+    live: true,
+  },
+  {
+    id: "asmr",
+    name: "ASMR & unboxing",
+    text: "Keep product sounds, trim empty waits.",
+    live: true,
+  },
+  {
+    id: "ai-combine",
+    name: "AI Combine",
+    text: "Gemini finds beautiful moments in both clips and blends them.",
+    live: true,
+  },
+];
 
 export function NewProjectPage() {
-  const navigate = useNavigate()
-  const { create, process } = useProjects()
-  const [file, setFile] = useState<File | null>(null)
-  const [duration, setDuration] = useState(0)
-  const [fileB, setFileB] = useState<File | null>(null)
-  const [durationB, setDurationB] = useState(0)
-  const [drag, setDrag] = useState(false)
-  const [dragB, setDragB] = useState(false)
-  const [mode, setMode] = useState<EditingModeId>('talking-head')
-  const [options, setOptions] = useState<ProjectOptions>(DEFAULT_PROJECT_OPTIONS)
-  const [title, setTitle] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadStats, setUploadStats] = useState<UploadProgress | null>(null)
-  const editorRef = useRef<any>(null)
+  const navigate = useNavigate();
+  const { create, process } = useProjects();
+  const [file, setFile] = useState<File | null>(null);
+  const [duration, setDuration] = useState(0);
+  const [fileB, setFileB] = useState<File | null>(null);
+  const [durationB, setDurationB] = useState(0);
+  const [drag, setDrag] = useState(false);
+  const [dragB, setDragB] = useState(false);
+  const [mode, setMode] = useState<EditingModeId>("talking-head");
+  const [options, setOptions] = useState<ProjectOptions>(
+    DEFAULT_PROJECT_OPTIONS,
+  );
+  const [title, setTitle] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStats, setUploadStats] = useState<UploadProgress | null>(null);
+  const editorRef = useRef<any>(null);
 
   const patchOptions = useCallback(
     <K extends keyof ProjectOptions>(key: K, value: ProjectOptions[K]) => {
-      setOptions((prev) => ({ ...prev, [key]: value }))
+      setOptions((prev) => ({ ...prev, [key]: value }));
     },
     [],
-  )
+  );
 
   const applySavedCut = useCallback(async () => {
     try {
-      const savedFile = await editorRef.current?.saveTrimmedClip()
+      const savedFile = await editorRef.current?.saveTrimmedClip();
       if (!savedFile) {
-        setError('Could not cut and save the selected clip.')
-        return
+        setError("Could not cut and save the selected clip.");
+        return;
       }
 
-      setFile(savedFile)
-      setDuration(Math.max(1, Math.ceil((savedFile as any).duration || 5)))
-      setError('')
-      setTitle((prev) => prev || savedFile.name.replace(/\.[^.]+$/, ''))
-      patchOptions('timelineJson', { source: 'cut-saved', fileName: savedFile.name })
+      setFile(savedFile);
+      setDuration(Math.max(1, Math.ceil((savedFile as any).duration || 5)));
+      setError("");
+      setTitle((prev) => prev || savedFile.name.replace(/\.[^.]+$/, ""));
+      patchOptions("timelineJson", {
+        source: "cut-saved",
+        fileName: savedFile.name,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save cut video.')
+      setError(
+        err instanceof Error ? err.message : "Failed to save cut video.",
+      );
     }
-  }, [patchOptions])
+  }, [patchOptions]);
 
   const onFile = useCallback(
     async (next: File | null) => {
-      setError('')
-      setUploadProgress(0)
-      setUploadStats(null)
-      setFile(null)
-      setDuration(0)
-      if (!next) return
-      const result = await validateVideoFile(next)
+      setError("");
+      setUploadProgress(0);
+      setUploadStats(null);
+      setFile(null);
+      setDuration(0);
+      if (!next) return;
+      const result = await validateVideoFile(next);
       if (!result.ok) {
-        setError(result.error)
-        return
+        setError(result.error);
+        return;
       }
-      setFile(next)
-      setDuration(result.durationSeconds)
+      setFile(next);
+      setDuration(result.durationSeconds);
       if (!title) {
-        setTitle(next.name.replace(/\.[^.]+$/, ''))
+        setTitle(next.name.replace(/\.[^.]+$/, ""));
       }
     },
     [title],
-  )
+  );
 
   const onFileB = useCallback(async (next: File | null) => {
-    setError('')
-    setUploadProgress(0)
-    setUploadStats(null)
-    setFileB(null)
-    setDurationB(0)
-    if (!next) return
-    const result = await validateVideoFile(next)
+    setError("");
+    setUploadProgress(0);
+    setUploadStats(null);
+    setFileB(null);
+    setDurationB(0);
+    if (!next) return;
+    const result = await validateVideoFile(next);
     if (!result.ok) {
-      setError(result.error)
-      return
+      setError(result.error);
+      return;
     }
-    setFileB(next)
-    setDurationB(result.durationSeconds)
-  }, [])
+    setFileB(next);
+    setDurationB(result.durationSeconds);
+  }, []);
 
   const onDrop = (event: DragEvent) => {
-    event.preventDefault()
-    setDrag(false)
-    const next = event.dataTransfer.files?.[0]
-    if (next) void onFile(next)
-  }
+    event.preventDefault();
+    setDrag(false);
+    const next = event.dataTransfer.files?.[0];
+    if (next) void onFile(next);
+  };
 
   const onDropB = (event: DragEvent) => {
-    event.preventDefault()
-    setDragB(false)
-    const next = event.dataTransfer.files?.[0]
-    if (next) void onFileB(next)
-  }
+    event.preventDefault();
+    setDragB(false);
+    const next = event.dataTransfer.files?.[0];
+    if (next) void onFileB(next);
+  };
 
   const handleTimelineChange = useCallback(
     (json: unknown) => {
-      patchOptions('timelineJson', json as ProjectOptions['timelineJson'])
+      patchOptions("timelineJson", json as ProjectOptions["timelineJson"]);
     },
     [patchOptions],
-  )
+  );
 
   const onSubmit = async (event: FormEvent) => {
-    event.preventDefault()
+    event.preventDefault();
     if (!file) {
-      setError('Choose a video file to upload.')
-      return
+      setError("Choose a video file to upload.");
+      return;
     }
-    if (mode === 'ai-combine' && !fileB) {
-      setError('AI Combine needs a second video.')
-      return
+    if (mode === "ai-combine" && !fileB) {
+      setError("AI Combine needs a second video.");
+      return;
     }
-    setBusy(true)
-    setError('')
-    setUploadProgress(0)
-    setUploadStats(null)
+    setBusy(true);
+    setError("");
+    setUploadProgress(0);
+    setUploadStats(null);
     try {
       const timelineJson =
-        (await editorRef.current?.getTimelineJson()) ?? options.timelineJson
+        (await editorRef.current?.getTimelineJson()) ?? options.timelineJson;
       const project = await create(
         {
           file,
-          secondaryFile: mode === 'ai-combine' ? fileB ?? undefined : undefined,
+          secondaryFile:
+            mode === "ai-combine" ? (fileB ?? undefined) : undefined,
           durationSeconds: duration,
           secondaryDurationSeconds:
-            mode === 'ai-combine' ? durationB : undefined,
+            mode === "ai-combine" ? durationB : undefined,
           mode,
           options: { ...options, timelineJson },
           title: title.trim() || undefined,
         },
         (progress) => {
-          setUploadStats(progress)
-          setUploadProgress(progress.percent)
+          setUploadStats(progress);
+          setUploadProgress(progress.percent);
         },
-      )
-      setUploadProgress(100)
-      void process(project.id)
-      navigate(ROUTES.project(project.id), { state: { project } })
+      );
+      setUploadProgress(100);
+      void process(project.id);
+      navigate(ROUTES.project(project.id), { state: { project } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed.')
+      setError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
-      setBusy(false)
+      setBusy(false);
     }
-  }
+  };
 
   return (
     <Page>
@@ -571,15 +585,15 @@ export function NewProjectPage() {
         </TitleBlock>
         <Button
           type="button"
-          disabled={busy || !file || (mode === 'ai-combine' && !fileB)}
+          disabled={busy || !file || (mode === "ai-combine" && !fileB)}
           onClick={() => {
             const form = document.getElementById(
-              'new-project-form',
-            ) as HTMLFormElement | null
-            form?.requestSubmit()
+              "new-project-form",
+            ) as HTMLFormElement | null;
+            form?.requestSubmit();
           }}
         >
-          {busy ? 'Uploading…' : 'Submit edit'}
+          {busy ? "Uploading…" : "Submit edit"}
         </Button>
       </Header>
 
@@ -603,14 +617,14 @@ export function NewProjectPage() {
                     <div>
                       <strong>
                         {item.name}
-                        {item.live ? ' · live' : ' · preview'}
+                        {item.live ? " · live" : " · preview"}
                       </strong>
                       <ModeText>{item.text}</ModeText>
                     </div>
                   </ModeOption>
                 ))}
               </ModeGrid>
-              {mode === 'ai-combine' && (
+              {mode === "ai-combine" && (
                 <HelpText style={{ marginBottom: 0 }}>
                   AI Combine samples frames from both videos, lets Gemini pick
                   the most beautiful / important moments, then FFmpeg cuts and
@@ -623,7 +637,7 @@ export function NewProjectPage() {
           <Panel>
             <PanelHead>
               <PanelTitle>
-                {mode === 'ai-combine' ? 'Video A' : 'Source upload'}
+                {mode === "ai-combine" ? "Video A" : "Source upload"}
               </PanelTitle>
               <Step>2</Step>
             </PanelHead>
@@ -632,30 +646,30 @@ export function NewProjectPage() {
                 $active={drag}
                 $hasFile={Boolean(file)}
                 onDragEnter={(e) => {
-                  e.preventDefault()
-                  setDrag(true)
+                  e.preventDefault();
+                  setDrag(true);
                 }}
                 onDragOver={(e) => e.preventDefault()}
                 onDragLeave={() => setDrag(false)}
                 onDrop={onDrop}
-                onClick={() => document.getElementById('video-file')?.click()}
+                onClick={() => document.getElementById("video-file")?.click()}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    document.getElementById('video-file')?.click()
+                  if (e.key === "Enter" || e.key === " ") {
+                    document.getElementById("video-file")?.click();
                   }
                 }}
               >
                 <div>
-                  <DropIcon aria-hidden>{file ? '✓' : '↑'}</DropIcon>
+                  <DropIcon aria-hidden>{file ? "✓" : "↑"}</DropIcon>
                   <DropTitle>
-                    {file ? file.name : 'Drop video or browse'}
+                    {file ? file.name : "Drop video or browse"}
                   </DropTitle>
                   <DropMeta>
                     {file
                       ? `${formatBytes(file.size)} · ${formatDuration(duration)}`
-                      : 'MP4 / MOV / WebM · max 2 GB · 20 min'}
+                      : "MP4 / MOV / WebM · max 2 GB · 20 min"}
                   </DropMeta>
                 </div>
               </Dropzone>
@@ -667,31 +681,32 @@ export function NewProjectPage() {
               />
               {busy && (
                 <>
-                  <Progress style={{ marginTop: '0.65rem' }}>
+                  <Progress style={{ marginTop: "0.65rem" }}>
                     <ProgressBar $value={uploadProgress} />
                   </Progress>
                   {uploadStats && (
                     <UploadStats>
-                      {formatBytes(uploadStats.uploadedBytes)} /{' '}
-                      {formatBytes(uploadStats.totalBytes)} ·{' '}
-                      {uploadStats.percent.toFixed(1)}% ·{' '}
+                      {formatBytes(uploadStats.uploadedBytes)} /{" "}
+                      {formatBytes(uploadStats.totalBytes)} ·{" "}
+                      {uploadStats.percent.toFixed(1)}% ·{" "}
                       {uploadStats.bytesPerSecond > 0
                         ? `${formatBytes(uploadStats.bytesPerSecond)}/s`
-                        : 'measuring speed…'}{' '}
-                      · {formatRemaining(uploadStats.remainingSeconds)} remaining
+                        : "measuring speed…"}{" "}
+                      · {formatRemaining(uploadStats.remainingSeconds)}{" "}
+                      remaining
                     </UploadStats>
                   )}
                 </>
               )}
               {error && (
-                <ErrorText style={{ marginTop: '0.65rem', marginBottom: 0 }}>
+                <ErrorText style={{ marginTop: "0.65rem", marginBottom: 0 }}>
                   {error}
                 </ErrorText>
               )}
             </PanelBody>
           </Panel>
 
-          {mode === 'ai-combine' && (
+          {mode === "ai-combine" && (
             <Panel>
               <PanelHead>
                 <PanelTitle>Video B</PanelTitle>
@@ -702,30 +717,32 @@ export function NewProjectPage() {
                   $active={dragB}
                   $hasFile={Boolean(fileB)}
                   onDragEnter={(e) => {
-                    e.preventDefault()
-                    setDragB(true)
+                    e.preventDefault();
+                    setDragB(true);
                   }}
                   onDragOver={(e) => e.preventDefault()}
                   onDragLeave={() => setDragB(false)}
                   onDrop={onDropB}
-                  onClick={() => document.getElementById('video-file-b')?.click()}
+                  onClick={() =>
+                    document.getElementById("video-file-b")?.click()
+                  }
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      document.getElementById('video-file-b')?.click()
+                    if (e.key === "Enter" || e.key === " ") {
+                      document.getElementById("video-file-b")?.click();
                     }
                   }}
                 >
                   <div>
-                    <DropIcon aria-hidden>{fileB ? '✓' : '↑'}</DropIcon>
+                    <DropIcon aria-hidden>{fileB ? "✓" : "↑"}</DropIcon>
                     <DropTitle>
-                      {fileB ? fileB.name : 'Drop second video or browse'}
+                      {fileB ? fileB.name : "Drop second video or browse"}
                     </DropTitle>
                     <DropMeta>
                       {fileB
                         ? `${formatBytes(fileB.size)} · ${formatDuration(durationB)}`
-                        : 'Required for AI Combine'}
+                        : "Required for AI Combine"}
                     </DropMeta>
                   </div>
                 </Dropzone>
@@ -739,7 +756,7 @@ export function NewProjectPage() {
             </Panel>
           )}
 
-              {file && mode !== 'ai-combine' && (
+          {file && mode !== "ai-combine" && (
             <Panel>
               <PanelHead>
                 <PanelTitle>Edit video</PanelTitle>
@@ -747,46 +764,61 @@ export function NewProjectPage() {
               </PanelHead>
               <PanelBody>
                 <EditorShell>
-                <ShotstackEditor
-                  ref={editorRef}
-                  file={file}
-                  durationSeconds={duration}
-                  onTimelineChange={handleTimelineChange}
-                  onCaptionsChange={({ enabled, position, fontFamily, fontSize, color }) => {
-                    patchOptions('captions', enabled)
-                    patchOptions('captionPosition', position)
-                    patchOptions('captionFontFamily', fontFamily)
-                    patchOptions('captionFontSize', fontSize)
-                    patchOptions('captionColor', color)
-                  }}
-                />
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.85rem', paddingTop: '0.85rem', borderTop: '1px solid #e9e4f5' }}>
-                  <Button
-                    type="button"
-                    $variant="secondary"
-                    onClick={async () => {
-                      try {
-                        const json = await editorRef.current?.getTimelineJson()
-                        if (json) {
-                          patchOptions('timelineJson', json)
-                        } else {
-                          alert('Could not extract timeline JSON from the editor.')
-                        }
-                      } catch (e) {
-                        console.error(e)
-                        alert('Failed to save timeline.')
-                      }
+                  <ShotstackEditor
+                    ref={editorRef}
+                    file={file}
+                    durationSeconds={duration}
+                    onTimelineChange={handleTimelineChange}
+                    onCaptionsChange={({
+                      enabled,
+                      position,
+                      fontFamily,
+                      fontSize,
+                      color,
+                    }) => {
+                      patchOptions("captions", enabled);
+                      patchOptions("captionPosition", position);
+                      patchOptions("captionFontFamily", fontFamily);
+                      patchOptions("captionFontSize", fontSize);
+                      patchOptions("captionColor", color);
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "0.5rem",
+                      flexWrap: "wrap",
+                      marginTop: "0.85rem",
+                      paddingTop: "0.85rem",
+                      borderTop: "1px solid #e9e4f5",
                     }}
                   >
-                    Save timeline edits
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => void applySavedCut()}
-                  >
-                    Cut & save clip
-                  </Button>
-                </div>
+                    <Button
+                      type="button"
+                      $variant="secondary"
+                      onClick={async () => {
+                        try {
+                          const json =
+                            await editorRef.current?.getTimelineJson();
+                          if (json) {
+                            patchOptions("timelineJson", json);
+                          } else {
+                            alert(
+                              "Could not extract timeline JSON from the editor.",
+                            );
+                          }
+                        } catch (e) {
+                          console.error(e);
+                          alert("Failed to save timeline.");
+                        }
+                      }}
+                    >
+                      Save timeline edits
+                    </Button>
+                    <Button type="button" onClick={() => void applySavedCut()}>
+                      Cut & save clip
+                    </Button>
+                  </div>
                 </EditorShell>
               </PanelBody>
             </Panel>
@@ -816,8 +848,8 @@ export function NewProjectPage() {
                   value={options.aspectRatio}
                   onChange={(e) =>
                     patchOptions(
-                      'aspectRatio',
-                      e.target.value as ProjectOptions['aspectRatio'],
+                      "aspectRatio",
+                      e.target.value as ProjectOptions["aspectRatio"],
                     )
                   }
                 >
@@ -827,15 +859,17 @@ export function NewProjectPage() {
                 </Select>
               </Field>
 
-              {(mode === 'talking-head' || mode === 'asmr' || mode === 'rapid-cut') && (
+              {(mode === "talking-head" ||
+                mode === "asmr" ||
+                mode === "rapid-cut") && (
                 <Field>
                   Silence sensitivity
                   <Select
                     value={options.silenceSensitivity}
                     onChange={(e) =>
                       patchOptions(
-                        'silenceSensitivity',
-                        e.target.value as ProjectOptions['silenceSensitivity'],
+                        "silenceSensitivity",
+                        e.target.value as ProjectOptions["silenceSensitivity"],
                       )
                     }
                   >
@@ -846,15 +880,15 @@ export function NewProjectPage() {
                 </Field>
               )}
 
-              {(mode === 'rapid-cut' || mode === 'asmr') && (
+              {(mode === "rapid-cut" || mode === "asmr") && (
                 <Field>
                   Pacing
                   <Select
                     value={options.pacing}
                     onChange={(e) =>
                       patchOptions(
-                        'pacing',
-                        e.target.value as ProjectOptions['pacing'],
+                        "pacing",
+                        e.target.value as ProjectOptions["pacing"],
                       )
                     }
                   >
@@ -871,8 +905,8 @@ export function NewProjectPage() {
                   value={options.speedRamp}
                   onChange={(e) =>
                     patchOptions(
-                      'speedRamp',
-                      e.target.value as ProjectOptions['speedRamp'],
+                      "speedRamp",
+                      e.target.value as ProjectOptions["speedRamp"],
                     )
                   }
                 >
@@ -889,8 +923,8 @@ export function NewProjectPage() {
                   value={options.keyframePreset}
                   onChange={(e) =>
                     patchOptions(
-                      'keyframePreset',
-                      e.target.value as ProjectOptions['keyframePreset'],
+                      "keyframePreset",
+                      e.target.value as ProjectOptions["keyframePreset"],
                     )
                   }
                   disabled={!options.keyframing}
@@ -910,8 +944,8 @@ export function NewProjectPage() {
                       value={options.captionPosition}
                       onChange={(e) =>
                         patchOptions(
-                          'captionPosition',
-                          e.target.value as ProjectOptions['captionPosition'],
+                          "captionPosition",
+                          e.target.value as ProjectOptions["captionPosition"],
                         )
                       }
                     >
@@ -925,8 +959,8 @@ export function NewProjectPage() {
                       value={options.captionFontFamily}
                       onChange={(e) =>
                         patchOptions(
-                          'captionFontFamily',
-                          e.target.value as ProjectOptions['captionFontFamily'],
+                          "captionFontFamily",
+                          e.target.value as ProjectOptions["captionFontFamily"],
                         )
                       }
                     >
@@ -945,8 +979,10 @@ export function NewProjectPage() {
                       value={options.captionFontSize}
                       onChange={(e) =>
                         patchOptions(
-                          'captionFontSize',
-                          Number(e.target.value) as ProjectOptions['captionFontSize'],
+                          "captionFontSize",
+                          Number(
+                            e.target.value,
+                          ) as ProjectOptions["captionFontSize"],
                         )
                       }
                     >
@@ -963,8 +999,8 @@ export function NewProjectPage() {
                       value={options.captionColor}
                       onChange={(e) =>
                         patchOptions(
-                          'captionColor',
-                          e.target.value as ProjectOptions['captionColor'],
+                          "captionColor",
+                          e.target.value as ProjectOptions["captionColor"],
                         )
                       }
                     >
@@ -984,7 +1020,7 @@ export function NewProjectPage() {
                 <input
                   type="checkbox"
                   checked={options.captions}
-                  onChange={(e) => patchOptions('captions', e.target.checked)}
+                  onChange={(e) => patchOptions("captions", e.target.checked)}
                 />
               </Toggle>
               <Toggle>
@@ -992,7 +1028,7 @@ export function NewProjectPage() {
                 <input
                   type="checkbox"
                   checked={options.keyframing}
-                  onChange={(e) => patchOptions('keyframing', e.target.checked)}
+                  onChange={(e) => patchOptions("keyframing", e.target.checked)}
                 />
               </Toggle>
               <Toggle>
@@ -1000,7 +1036,7 @@ export function NewProjectPage() {
                 <input
                   type="checkbox"
                   checked={options.keepAudio}
-                  onChange={(e) => patchOptions('keepAudio', e.target.checked)}
+                  onChange={(e) => patchOptions("keepAudio", e.target.checked)}
                 />
               </Toggle>
               <Toggle>
@@ -1009,7 +1045,7 @@ export function NewProjectPage() {
                   type="checkbox"
                   checked={options.audioNormalize}
                   onChange={(e) =>
-                    patchOptions('audioNormalize', e.target.checked)
+                    patchOptions("audioNormalize", e.target.checked)
                   }
                 />
               </Toggle>
@@ -1023,8 +1059,8 @@ export function NewProjectPage() {
                   value={options.cropPreset}
                   onChange={(e) =>
                     patchOptions(
-                      'cropPreset',
-                      e.target.value as ProjectOptions['cropPreset'],
+                      "cropPreset",
+                      e.target.value as ProjectOptions["cropPreset"],
                     )
                   }
                 >
@@ -1041,8 +1077,8 @@ export function NewProjectPage() {
                   value={options.colorGrade}
                   onChange={(e) =>
                     patchOptions(
-                      'colorGrade',
-                      e.target.value as ProjectOptions['colorGrade'],
+                      "colorGrade",
+                      e.target.value as ProjectOptions["colorGrade"],
                     )
                   }
                 >
@@ -1061,7 +1097,7 @@ export function NewProjectPage() {
                 <input
                   type="checkbox"
                   checked={options.fadeInOut}
-                  onChange={(e) => patchOptions('fadeInOut', e.target.checked)}
+                  onChange={(e) => patchOptions("fadeInOut", e.target.checked)}
                 />
               </Toggle>
               <Toggle>
@@ -1070,7 +1106,7 @@ export function NewProjectPage() {
                   type="checkbox"
                   checked={options.introTitleCard}
                   onChange={(e) =>
-                    patchOptions('introTitleCard', e.target.checked)
+                    patchOptions("introTitleCard", e.target.checked)
                   }
                 />
               </Toggle>
@@ -1080,23 +1116,23 @@ export function NewProjectPage() {
                   type="checkbox"
                   checked={options.mirrorHorizontal}
                   onChange={(e) =>
-                    patchOptions('mirrorHorizontal', e.target.checked)
+                    patchOptions("mirrorHorizontal", e.target.checked)
                   }
                 />
               </Toggle>
             </ToggleGrid>
 
             <Footer>
-              <HelpText style={{ fontSize: '0.75rem' }}>
+              <HelpText style={{ fontSize: "0.75rem" }}>
                 One successful render uses one edit credit. Failed jobs do not.
               </HelpText>
               <Button type="submit" disabled={busy || !file}>
-                {busy ? 'Uploading…' : 'Submit for AI editing'}
+                {busy ? "Uploading…" : "Submit for AI editing"}
               </Button>
             </Footer>
           </PanelBody>
         </Panel>
       </Layout>
     </Page>
-  )
+  );
 }
